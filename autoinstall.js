@@ -1,4 +1,5 @@
-//  This script allows you to use require(...) for NPM modules in AWS Lambda Functions.
+//  This script allows you to use require(...) for NPM modules in AWS Lambda Functions,
+//  without preinstalling or bundling the dependencies in advance.
 //  The AWS Lambda Function should provide a package.json that lists the 
 //  NPM modules to be installed.  The NPM modules will be installed in /tmp/node_modules.
 //  This is meant to replicate the auto NPM install feature in Google Cloud.
