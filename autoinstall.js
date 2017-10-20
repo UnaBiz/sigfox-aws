@@ -19,15 +19,14 @@ function dependenciesNotInstalled() {
     return false;
 }
 
-function installDependenciesAndReload(package_json0, event, context, callback) {
-    //  Copy this source file to /tmp/index.js. Write /tmp/package.json.
+function installDependenciesAndReload(package_json, event, context, callback, sourceCode) {
+    //  Copy the specified source code to /tmp/index.js. Write /tmp/package.json.
     //  Then run "npm install" to install dependencies from package.json.
     //  Finally reload /tmp/index.js and continue execution from the handler.
     //  This is not as fast as preinstalling and bundling the dependencies,
     //  but it's easier to maintain and faster to prototype.
-    const source = fs.readFileSync(__filename);
-    fs.writeFileSync(installedSourceFilename, source);
-    fs.writeFileSync(installedPackageFilename, JSON.stringify(package_json0, null, 2));
+    fs.writeFileSync(installedSourceFilename, sourceCode);
+    fs.writeFileSync(installedPackageFilename, JSON.stringify(package_json, null, 2));
     const cmd = `export HOME=${tmp}; cd ${tmp}; ls -l; npm install; ls -l; ls -l node_modules; `;
     
     const child = exec(cmd, {maxBuffer: 1024 * 500}, (error) => {
@@ -44,7 +43,16 @@ function installDependenciesAndReload(package_json0, event, context, callback) {
     child.stderr.on('data', console.error);
 }
 
+function install(package_json, event, context, callback, sourceCode) {
+    //  Install the dependencies in package_json if not installed.  After installing dependencies,
+    //  relaunch the Lambda Function.  If dependencies already installed, do nothing and return true.
+    if (dependenciesNotInstalled()) {
+        installDependenciesAndReload(package_json, event, context, callback, sourceCode);
+        return false;
+    }
+    return true;
+}
+
 module.exports = {
-    dependenciesNotInstalled,
-    installDependenciesAndReload,
+    install,
 };
