@@ -1,0 +1,49 @@
+{
+  "name": "sigfox-aws",
+  "version": "0.0.1",
+  "description": "Framework for building a Sigfox server, based on Amazon Web Services and Lambda Functions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "sigfox",
+    "aws",
+    "lambda",
+    "iot"
+  ],
+  "author": {
+    "name": "Lee Lup Yuen",
+    "email": "ly.lee@unabiz.com",
+    "url": "http://github.com/unabiz/"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=7.8.0"
+  },
+  "dependencies": {
+    "dnscache": "^1.0.1",
+    "dotenv": "^4.0.0",
+    "json-stringify-safe": "^5.0.1",
+    "moment": "^2.18.1",
+    "node-fetch": "^1.6.3",
+    "safe-buffer": "5.0.1",
+    "uuid": "^3.1.0"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-as-promised": "^6.0.0",
+    "mockery": "^2.1.0",
+    "should": "^11.2.1",
+    "supertest": "^3.0.0",
+    "supertest-as-promised": "^4.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
+  },
+  "bugs": {
+    "url": "https://github.com/UnaBiz/sigfox-aws/issues"
+  },
+  "homepage": "https://github.com/UnaBiz/sigfox-aws#readme"
+}
