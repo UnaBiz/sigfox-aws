@@ -18,5 +18,9 @@
     "node-fetch": "^1.6.3",
     "json-stringify-safe": "^5.0.1",
     "uuid": "^3.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
   }
 }
