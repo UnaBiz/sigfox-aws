@@ -1,30 +1,18 @@
 //  Unit Test
 /* global describe:true, it:true, beforeEach:true */
-/* eslint-disable import/no-extraneous-dependencies, no-console, no-unused-vars, one-var,
- no-underscore-dangle */
-const fs = require('fs');
+/* eslint-disable max-len, import/no-extraneous-dependencies, no-console, no-unused-vars, one-var, no-underscore-dangle */
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
-const common = require('sigfox-gcloud');
-const knex = require('knex');
 const uuidv4 = require('uuid/v4');
 
-//  Copy google-credentials before starting.
-const creds = fs.readFileSync('./google-credentials.bak');
-fs.writeFileSync('./google-credentials.json', creds);
 const moduleTested = require('../index');  //  Module to be tested, i.e. the parent module.
 
 const moduleName = 'sendToDatabase';
 const should = chai.should();
 chai.use(chaiAsPromised);
 let req = {};
-let testMetadata = null;
-let testDatabaseConfig = null;
-let testDB = null;
 
-/* eslint-disable quotes, max-len */
-const testInstance = null;  //  Simulates sendToDatabase
-// const testInstance = '2';  //  Simulates sendToDatabase2
+/* eslint-disable quotes */
 const testDevice1 = 'UNITTEST1';
 
 const testData = {  //  Structured msgs with numbers and text fields.
@@ -74,7 +62,7 @@ const testMessage = (timestamp, device, data) => ({
   body: testBody(timestamp, device, data),
   type: moduleName,
 });
-/* eslint-enable quotes, max-len */
+/* eslint-enable quotes */
 
 function startDebug() {
   //  Stub for setting breakpoints on exception.
@@ -95,111 +83,15 @@ describe(moduleName, () => {
     req = { unittest: true };
   });
 
-  it.skip('should set up google-credentials.json', () => {
-    const creds0 = fs.readFileSync('./google-credentials.bak');
-    fs.writeFileSync('./google-credentials.json', creds0);
+  it('should log', () => {
+    const msg = getTestMessage('number', testDevice1);
+    moduleTested.log(req, 'action123/subAction456', { result: 'OK', number: 789, obj: { level1: { level2: {} } }, msg });
     return Promise.resolve('OK');
   });
 
-  it('should get config from metadata', () => {
-    //  Get the config from Google Compute Metadata.
-    const promise = moduleTested.getMetadataConfig(req,
-      moduleTested.metadataPrefix,
-      moduleTested.metadataKeys,
-      testInstance)
-      .then((result) => {
-        common.log(req, 'unittest', { result });
-        testMetadata = result;
-        return result;
-      })
-      .catch((error) => {
-        common.error(req, 'unittest', { error });
-        throw error;
-      })
-    ;
-    return Promise.all([
-      promise,
-    ]);
-  });
-
-  it('should get database config', () => {
-    //  Get the database config from Google Compute Metadata.
-    const promise = moduleTested.getDatabaseConfig(req, false, testInstance)
-      .then((result) => {
-        common.log(req, 'unittest', { result });
-        testDatabaseConfig = result;
-        testDB = knex(testDatabaseConfig);
-        return result;
-      })
-      .catch((error) => {
-        common.error(req, 'unittest', { error });
-        throw error;
-      })
-    ;
-    return Promise.all([
-      promise,
-    ]);
-  });
-
-  it.skip('should delete sensor table', () => {
-    //  Delete the sensor table.
-    const promise = testDB.schema.dropTableIfExists(testMetadata.table)
-      .then((result) => {
-        common.log(req, 'unittest', { result });
-        return result;
-      })
-      .catch((error) => {
-        common.error(req, 'unittest', { error });
-        throw error;
-      })
-    ;
-    return Promise.all([
-      promise,
-    ]);
-  });
-
-  it('should create sensor table', () => {
-    //  Create the sensordata table.
-    const promise = moduleTested.createTable(req)
-      .then((result) => {
-        common.log(req, 'unittest', { result });
-        return result;
-      })
-      .catch((error) => {
-        common.error(req, 'unittest', { error });
-        throw error;
-      })
-    ;
-    return Promise.all([
-      promise,
-    ]);
-  });
-
-  it('should record sensor data', () => {
-    //  Create a new record in the sensordata table.
-    const testDevice = testDevice1;
-    const msg = getTestMessage('number', testDevice);
-    const body = msg.body;
-    common.log(req, 'unittest', { testDevice, body, msg });
-    const promise = moduleTested.task(req, testDevice, body, msg)
-      .then((result) => {
-        common.log(req, 'unittest', { result });
-        return result;
-      })
-      .catch((error) => {
-        common.error(req, 'unittest', { error });
-        throw error;
-      })
-    ;
-    return Promise.all([
-      promise,
-    ]);
-  });
-
-  it('should delete google-credentials.json', () => {
-    const creds0 = fs.readFileSync('./google-credentials.json');
-    fs.writeFileSync('./google-credentials.bak', creds0);
-    fs.unlink('./google-credentials.json');
+  it('should log errors', () => {
+    const msg = getTestMessage('number', testDevice1);
+    moduleTested.log(req, 'action123/subAction456', { error: new Error('This is the error message'), number: 789, obj: { level1: { level2: {} } }, msg });
     return Promise.resolve('OK');
   });
 });
