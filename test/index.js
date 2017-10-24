@@ -7,7 +7,7 @@ const uuidv4 = require('uuid/v4');
 
 const moduleTested = require('../index');  //  Module to be tested, i.e. the parent module.
 
-const moduleName = 'sendToDatabase';
+const moduleName = 'sigfox-aws';
 const should = chai.should();
 chai.use(chaiAsPromised);
 let req = {};
@@ -86,12 +86,12 @@ describe(moduleName, () => {
   it('should log', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { result: 'OK', number: 789, obj: { level1: { level2: {} } }, msg });
-    return Promise.resolve('OK');
+    return moduleTested.flushLog(req);
   });
 
   it('should log errors', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { error: new Error('This is the error message'), number: 789, obj: { level1: { level2: {} } }, msg });
-    return Promise.resolve('OK');
+    return moduleTested.flushLog(req);
   });
 });
