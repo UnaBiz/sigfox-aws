@@ -24,7 +24,6 @@ const stringify = require('json-stringify-safe');
 const cloudCredentials = {};
 const logName = process.env.LOGNAME || 'sigfox-aws';  //  Name of the log to write to.
 const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGTH, 10) : 40;  //  Width of the left column in logs
-const loggingLog = { write: (/* entry */) => Promise.resolve({}) };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Utility Functions
@@ -201,6 +200,12 @@ const logTasks = [];  //  List of logging tasks to be completed.  They return a 
 let taskCount = 0;  //  Number of logging tasks completed so far.
 //  Maps operationid to the promise for the child span, for instrumentation.
 const allSpanPromises = {};
+
+//  TODO: Draft logger
+const loggingLog = {
+  write: (entry) => { console.log(JSON.stringify(entry)); return Promise.resolve({}); },
+  entry: (metadata, event) => ({ metadata, event }),
+};
 
 function createTraceID(now0) {
   //  Return a trace ID array with local time MMSS-uuid for display later.
@@ -541,6 +546,7 @@ function publishMessage(req, oldMessage, device, type) {
   //  eslint-disable-next-line global-require
   //  TODO: Stub!!!
   //  const topic = require('@google-cloud/pubsub')(credentials).topic(topicName);
+  const topic = 'missing_topic';
 
   let message = Object.assign({}, oldMessage,
     device ? { device: (device === 'all') ? oldMessage.device : device }
