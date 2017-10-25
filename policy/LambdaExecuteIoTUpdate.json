@@ -44,8 +44,14 @@
     {
       "Effect": "Allow",
       "Action": [
+        "iot:ListThingTypes",
+        "iot:ListThings",
+        "iot:DescribeEndpoint",
+        "iot:DescribeThing",
+        "iot:DescribeThingType",
         "iot:GetThingShadow",
         "iot:UpdateThingShadow",
+        "iot:CreateThing",
         "iot:Publish"
       ],
       "Resource": "*"

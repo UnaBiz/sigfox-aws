@@ -71,8 +71,8 @@ function awsUpdateDeviceState(req, device, state) {
 
 function awsSendIoTMessage(req, topic0, payload) {
   //  Send the text message to the AWS IoT MQTT queue name.
-  //  In Google Cloud topics are named like sigfox.types.all.  We need to rename them
-  //  to AWS MQTT format like sigfox/types/all.
+  //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
+  //  to AWS MQTT format like sigfox/devices/all.
   const payloadObj = JSON.parse(payload);
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
@@ -84,8 +84,8 @@ function awsSendIoTMessage(req, topic0, payload) {
 
 function awsSendSQSMessage(req, topic0, msg) {
   //  Send the text message to the AWS Simple Queue Service queue name.
-  //  In Google Cloud topics are named like sigfox.types.all.  We need to rename them
-  //  to AWS SQS format like sigfox-types-all.
+  //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
+  //  to AWS SQS format like sigfox-devices-all.
   const msgObj = JSON.parse(msg);
   const topic = (topic0 || '').split('.').join('-');
   const url = `${SQS.endpoint.href}${topic}`;
