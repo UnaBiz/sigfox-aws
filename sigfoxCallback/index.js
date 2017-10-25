@@ -1,3 +1,18 @@
+//  Installation Instructions:
+//  Copy and paste the entire contents of this file into a Lambda Function
+//  Name: sigfoxCallback
+//  Memory: 512 MB
+//  Timeout: 1 min
+//  Existing Role: lambda_base_execution
+//  Debugging: Enable active tracing
+
+//  Add a trigger for API Gateway:
+//  Name: sigfoxGateway
+//  Method: ANY
+//  Resource path: /sigfoxCallback
+//  Authorization: NONE
+//  Stage: prod
+
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.
 //  We insert the Sigfox message into message queues:
@@ -57,9 +72,10 @@ const mainRes = {
   end: () => mainRes,
 };
 
-function prepareRequest() {
+function prepareRequest(body) {
   //  Prepare the request and result objects.
-  mainReq.body = {
+  mainReq.body = body;
+  /* mainReq.body looks like {
     device: '1A2345',
     data: 'b0513801a421f0019405a500',
     time: '1507112763',
@@ -73,11 +89,20 @@ function prepareRequest() {
     seqNumber: '1508',
     ack: 'false',
     longPolling: 'false',
-  };
+  }; */
 }
 
 // eslint-disable-next-line arrow-body-style
 exports.handler = (event, context, callback) => {
+  console.log('Received event:', JSON.stringify(event, null, 2));
+  const done = (err, res) => callback(null, {
+    statusCode: err ? '400' : '200',
+    body: err ? err.message : JSON.stringify(res),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
   //  Install the dependencies from package_json above.  Will reload the script.
   //  eslint-disable-next-line no-use-before-define
   return autoInstall(package_json, event, context, callback)
@@ -86,12 +111,13 @@ exports.handler = (event, context, callback) => {
 
       //  Dependencies loaded, so we can use require here.
       //  Prepare the request and result objects.
-      prepareRequest();  //  eslint-disable-next-line no-use-before-define
+      const body = JSON.parse(event.body);
+      prepareRequest(body);  //  eslint-disable-next-line no-use-before-define
       return wrap().main(mainReq, mainRes)
-        .then(() => callback(null, `Complete! ${__filename}`))
-        .catch(error => callback(error));
+        .then(() => done(null, 'OK'))
+        .catch(error => done(error, null));
     })
-    .catch(error => callback(error));
+    .catch(error => done(error, null));
 };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
