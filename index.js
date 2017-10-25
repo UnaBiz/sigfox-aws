@@ -28,13 +28,18 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS-Specific Functions
 
+//  TODO: Read from cloud metadata.
 const queueURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
 
 const AWS = require('aws-sdk');
 const SQS = new AWS.SQS({ apiVersion: '2012-11-05' });
 
+function awsReportError(/* err, action, para */) {
+  //  TODO
+}
+
 function awsSendMessage(req, topic0, msg) {
-  //  Send the text message to the AWS Simple Queue System queue name.
+  //  Send the text message to the AWS Simple Queue Service queue name.
   //  In Google Cloud topics are named like sigfox.types.all.  We need to rename them
   //  to AWS format like sigfox-types-all.
   const msgObj = JSON.parse(msg);
@@ -57,6 +62,19 @@ function awsSendMessage(req, topic0, msg) {
     .catch((error) => { module.exports.error(req, 'awsSendMessage', { error, topic, url, msgObj, params }); throw error; });
 }
 
+function awsGetTopic(req, projectId, topicName) {
+  //  Return the AWS Simple Queue Service queue with that name for that project.  Will be used for
+  //  publishing messages, not reading.
+  const topic = {
+    topic: topicName,
+    publisher: () => ({
+      publish: buffer => awsSendMessage(req, topicName, buffer.toString())
+        .catch((error) => { throw error; }),
+    }),
+  };
+  return topic;
+}
+
 //  TODO
 const loggingLog = {
   write: (entry) => { console.log(stringify(entry ? entry.event || '' : '', null, 2)); return Promise.resolve({}); },
@@ -66,15 +84,20 @@ const loggingLog = {
 //  TODO
 const rootSpanStub = {
   startSpan: (/* rootSpanName, labels */) => ({
-    end: () => ({}),  //  Stub
-  }),  //  Stub
+    end: () => ({}),
+  }),
   end: () => ({}),
 };
 const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-  startSpan: (/* rootSpanName, labels */) => rootSpanStub,  //  Stub
-  end: () => ({}),  //  Stub
+  startSpan: (/* rootSpanName, labels */) => rootSpanStub,
+  end: () => ({}),
 };
 const tracing = { startTrace: () => rootTraceStub };
+
+function awsRootTrace(/* req */) {
+  //  Return the root trace for instrumentation.
+  return rootTraceStub;
+}
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Utility Functions
@@ -200,11 +223,8 @@ function getRootSpan(req, rootTraceId0) {
       };
     } // eslint-disable-next-line new-cap
     //  TODO
-    const rootTrace = rootTraceStub;
-    /* const rootTrace = {  // new tracingtrace(tracing, rootTraceId);
-      startSpan: (rootSpanName, labels) => ({ end: () => ({}) }),  //  Stub
-      end: () => ({}),  //  Stub
-    }; */
+    //  const rootTrace = new tracingtrace(tracing, rootTraceId);
+    const rootTrace = awsRootTrace(req);
     //  Randomly assign the starting span ID.  Must not clash with previously assigned span ID
     //  for this trace ID.
     //  eslint-disable-next-line no-underscore-dangle
@@ -306,18 +326,17 @@ function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable globa
     let promises = Promise.resolve('start');
     const result = [];
     const logQueueConfig = logQueueConfig0 || module.exports.logQueueConfig;
-    logQueueConfig.forEach((/* config */) => {
-      /*  TODO: Stub
+    logQueueConfig.forEach((config) => {
       //  Create pubsub client upon use to prevent expired connection.
-      const credentials = Object.assign({}, //  googleCredentials,
-        { projectId: config.projectId });
-      const topic = require('@google-cloud/pubsub')(credentials)
-        .topic(config.topicName);
+      //  TODO
+      //  const credentials = Object.assign({}, googleCredentials, { projectId: config.projectId });
+      //  const topic = require('@google-cloud/pubsub')(credentials).topic(config.topicName);
+      const topic = awsGetTopic(req, config.projectId, config.topicName);
       promises = promises
         .then(() => publishJSON(req, topic, msg))
         //  Suppress any errors so logging can continue.
         .catch(dumpError)
-        .then((res) => { result.push(res); }); */
+        .then((res) => { result.push(res); });
     });
     return promises //  Suppress any errors.
       .catch(dumpError)
@@ -526,9 +545,10 @@ function log(req0, action, para0) {
     if (err && isProduction) {
       try {
         //  Report the error to the Cloud Error Reporting API
-        //  TODO: Stub
+        //  TODO
         /* const errorReport = require('@google-cloud/error-reporting')({ reportUnhandledRejections: true });
         errorReport.report(err); */
+        awsReportError(err, action, para);
       } catch (err2) { dumpError(err2); }
     }
     const record = { timestamp: `${now}`, action };
@@ -593,18 +613,8 @@ function publishMessage(req, oldMessage, device, type) {
   const topicName = res.topicName;
   //  Create pubsub client here to prevent expired connection.
   //  eslint-disable-next-line global-require
-  //  TODO: Stub!!!
   //  const topic = require('@google-cloud/pubsub')(credentials).topic(topicName);
-  const topic = {
-    topic: topicName,
-    publisher: () => ({
-      publish: (buffer) => {
-        console.log('publish queue', { topicName, buffer: buffer.toString() });
-        return awsSendMessage(req, topicName, buffer.toString())
-          .catch((error) => { throw error; });
-      },
-    }),
-  };
+  const topic = awsGetTopic(req, null, topicName);
 
   let message = Object.assign({}, oldMessage,
     device ? { device: (device === 'all') ? oldMessage.device : device }
@@ -620,6 +630,9 @@ function publishMessage(req, oldMessage, device, type) {
   }
   const pid = credentials.projectId || '';
   const destination = topicName;
+  //  If you get an error here because the queue doesn't exist, it may be OK.
+  //  sigfox.devices.all should always exist, but sigfox.devices.<<device>> and
+  //  sigfox.types.<<type>> don't have to exist unless you need them for custom processing.
   return publishJSON(req, topic, message)
     .then((result) => {
       log(req, 'publishMessage', { result, destination, topicName, message, device: oldMessage.device, type, projectId: pid });

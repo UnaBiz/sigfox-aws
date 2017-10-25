@@ -14,6 +14,11 @@
 //  Authorization: NONE
 //  Stage: prod
 
+//  AWS Simple Queue Service:
+//  Create the queue "sigfox-devices-all"
+//  Ensure that lambda_base_execution role has access to the queue:
+//  Grant "AmazonSQSFullAccess" to lambda_base_execution role.
+
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.
 //  We insert the Sigfox message into message queues:
@@ -49,7 +54,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.5",
+      "sigfox-aws": ">=0.0.6",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",
@@ -96,6 +101,7 @@ function prepareRequest(body) {
 // eslint-disable-next-line arrow-body-style
 exports.handler = (event, context, callback) => {
   console.log(JSON.stringify({ event, env: process.env }, null, 2));
+  //  We will call "done" to return a JSON response.
   const done = (err, res) => callback(null, {
     statusCode: err ? '400' : '200',
     body: err ? err.message : JSON.stringify(res),
@@ -302,28 +308,18 @@ function wrap() {
       .then((result) => { updatedMessage = result; return result; })
       .catch(error => scloud.log(req, 'error', { error, device, body, event, oldMessage }));
     const dispatchTask = runTask
-    //  Dispatch will be skipped because isDispatched is set.
+      //  Dispatch will be skipped because isDispatched is set.
       .then(() => scloud.dispatchMessage(req, updatedMessage, device))
       .catch(error => scloud.log(req, 'error', { error, device, body, event, updatedMessage }));
     return dispatchTask
-    //  Flush the log and wait for it to be completed.
+      //  Flush the log and wait for it to be completed.
       .then(() => scloud.endTask(req))
       .then(() => updatedMessage);
-  }
-
-  // eslint-disable-next-line no-shadow
-  function test() {
-    const req = {};
-    const msg = {};
-    scloud.log(req, 'action123/subAction456', { result: 'OK', number: 789, obj: { level1: { level2: {} } }, msg });
-    scloud.log(req, 'action123/subAction456', { error: new Error('This is the error message'), number: 789, obj: { level1: { level2: {} } }, msg });
-    return scloud.flushLog(req);
   }
 
   return {
     //  Expose these functions outside of the wrapper.
     main,
-    test,  //  Testing
   };
 }
 
