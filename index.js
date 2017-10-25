@@ -15,8 +15,8 @@ require('dotenv').load();
 //  Don't require any other cloud modules in global scope
 //  because the connections may expire when running for a long time
 
-const functionName = 'unknown_function';
-const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.  TODO: AWS
+const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME || 'unknown_function';
+const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
 const util = require('util');
 const uuidv4 = require('uuid/v4');
 const stringify = require('json-stringify-safe');
@@ -55,8 +55,18 @@ function awsSendMessage(req, topic, msg) {
 }
 
 //  TODO
+const loggingLog = {
+  write: (entry) => { console.log(stringify(entry ? entry.event || '' : '', null, 2)); return Promise.resolve({}); },
+  entry: (metadata, event) => ({ metadata, event }),
+};
+
+//  TODO
+const rootSpanStub = {
+  startSpan: (/* rootSpanName, labels */) => ({}),  //  Stub
+  end: () => ({}),
+};
 const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-  startSpan: (/* rootSpanName, labels */) => ({ end: () => ({}) }),  //  Stub
+  startSpan: (/* rootSpanName, labels */) => rootSpanStub,  //  Stub
   end: () => ({}),  //  Stub
 };
 const tracing = { startTrace: () => rootTraceStub };
@@ -116,7 +126,7 @@ function removeNulls(obj, level) {
 function dumpError(error, action, para) {
   //  Dump the error to the console and suppress the error.  Return the error.
   //  Action and para are optional.
-  console.error(action || '', error.message, error.stack, para || '');
+  console.error(action || '', error.message, error.stack, stringify(para || '', null, 2));
   return error;
 }
 
@@ -240,12 +250,6 @@ const logTasks = [];  //  List of logging tasks to be completed.  They return a 
 let taskCount = 0;  //  Number of logging tasks completed so far.
 //  Maps operationid to the promise for the child span, for instrumentation.
 const allSpanPromises = {};
-
-//  TODO: Draft logger
-const loggingLog = {
-  write: (entry) => { console.log(JSON.stringify(entry)); return Promise.resolve({}); },
-  entry: (metadata, event) => ({ metadata, event }),
-};
 
 function createTraceID(now0) {
   //  Return a trace ID array with local time MMSS-uuid for display later.

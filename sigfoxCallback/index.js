@@ -5,6 +5,7 @@
 //  Timeout: 1 min
 //  Existing Role: lambda_base_execution
 //  Debugging: Enable active tracing
+//  Environment Variables: NODE_ENV=production
 
 //  Add a trigger for API Gateway:
 //  Name: sigfoxGateway
@@ -48,7 +49,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.3",
+      "sigfox-aws": ">=0.0.4",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",
