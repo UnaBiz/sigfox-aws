@@ -112,6 +112,13 @@ function getSpanName(req) {
   return [device, seqNumber].join(' seq:');
 }
 
+//  TODO
+const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
+  startSpan: (/* rootSpanName, labels */) => ({ end: () => ({}) }),  //  Stub
+  end: () => ({}),  //  Stub
+};
+const tracing = { startTrace: () => rootTraceStub };
+
 function startRootSpan(req, rootTrace0) {
   //  Start a root-level trace and span to trace the request across Cloud Functions.
   //  Returns { rootTrace, rootSpan } objects.  rootTrace0 should be null, unless
@@ -119,7 +126,7 @@ function startRootSpan(req, rootTrace0) {
   //  https://github.com/zbjornson/gcloud-trace/blob/master/src/index.js
   //  Create the root trace.
   const labels = {};
-  const rootTrace = rootTrace0; // || tracing.startTrace();
+  const rootTrace = rootTrace0 || tracing.startTrace();
   //  Start the span.
   const rootSpanName = getSpanName(req);
   const rootSpan = rootTrace.startSpan(rootSpanName, labels);
@@ -148,10 +155,12 @@ function getRootSpan(req, rootTraceId0) {
         rootSpanPromise: Promise.resolve(null),
       };
     } // eslint-disable-next-line new-cap
-    const rootTrace = {  // new tracingtrace(tracing, rootTraceId);
-      startSpan: (/* rootSpanName, labels */) => ({ end: () => ({}) }),  //  Stub
+    //  TODO
+    const rootTrace = rootTraceStub;
+    /* const rootTrace = {  // new tracingtrace(tracing, rootTraceId);
+      startSpan: (rootSpanName, labels) => ({ end: () => ({}) }),  //  Stub
       end: () => ({}),  //  Stub
-    };
+    }; */
     //  Randomly assign the starting span ID.  Must not clash with previously assigned span ID
     //  for this trace ID.
     //  eslint-disable-next-line no-underscore-dangle

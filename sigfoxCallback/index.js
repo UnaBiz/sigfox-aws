@@ -48,17 +48,44 @@ const package_json = {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS Lambda Startup
 
+const mainReq = {};
+const mainRes = {
+  status: (/* code */) => mainRes,  //  TODO
+  json: (/* json */) => mainRes,  //  TODO
+  end: () => mainRes,
+};
+
+function prepareRequest() {
+  //  Prepare the request and result objects.
+  mainReq.body = {
+    device: '1A2345',
+    data: 'b0513801a421f0019405a500',
+    time: '1507112763',
+    duplicate: 'false',
+    snr: '18.86',
+    station: '1D44',
+    avgSnr: '15.54',
+    lat: '1',
+    lng: '104',
+    rssi: '-123.00',
+    seqNumber: '1508',
+    ack: 'false',
+    longPolling: 'false',
+  };
+}
+
 // eslint-disable-next-line arrow-body-style
 exports.handler = (event, context, callback) => {
   //  Install the dependencies from package_json above.  Will reload the script.
   //  eslint-disable-next-line no-use-before-define
   return autoInstall(package_json, event, context, callback)
     .then((installed) => {
-      if (!installed) return null;  //  Dependencies installing now.
+      if (!installed) return null;  //  Dependencies installing now.  Wait until this Lambda reloads.
 
       //  Dependencies loaded, so we can use require here.
-      //  eslint-disable-next-line no-use-before-define
-      return wrap().main(req, res)
+      //  Prepare the request and result objects.
+      prepareRequest();  //  eslint-disable-next-line no-use-before-define
+      return wrap().main(mainReq, mainRes)
         .then(() => callback(null, `Complete! ${__filename}`))
         .catch(error => callback(error));
     })
