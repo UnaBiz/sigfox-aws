@@ -33,9 +33,12 @@ const queueURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
 const AWS = require('aws-sdk');
 const SQS = new AWS.SQS({ apiVersion: '2012-11-05' });
 
-function awsSendMessage(req, topic, msg) {
+function awsSendMessage(req, topic0, msg) {
   //  Send the text message to the AWS Simple Queue System queue name.
+  //  In Google Cloud topics are named like sigfox.types.all.  We need to rename them
+  //  to AWS format like sigfox-types-all.
   const msgObj = JSON.parse(msg);
+  const topic = (topic0 || '').split('.').join('-');
   const url = `${queueURL}/${topic}`;
   const params = {
     MessageBody: msg,
@@ -62,7 +65,9 @@ const loggingLog = {
 
 //  TODO
 const rootSpanStub = {
-  startSpan: (/* rootSpanName, labels */) => ({}),  //  Stub
+  startSpan: (/* rootSpanName, labels */) => ({
+    end: () => ({}),  //  Stub
+  }),  //  Stub
   end: () => ({}),
 };
 const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);

@@ -33,7 +33,7 @@
 //  region AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
 
 const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
-
+//  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
   {
     "name": "sigfoxCallback",
     "version": "0.0.1",
@@ -49,7 +49,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.4",
+      "sigfox-aws": ">=0.0.5",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",
@@ -60,7 +60,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
       "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
     }
   }
-
+//  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
 ; /* eslint-enable quote-props,quotes,comma-dangle,indent */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion

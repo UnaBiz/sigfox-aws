@@ -101,7 +101,7 @@ describe(moduleName, () => {
 
   it('should publish message', () => {
     const msg = getTestMessage('number', testDevice1);
-    const type = 'testtype';
+    const type = 'all';
     return moduleTested.publishMessage(req, msg, null, type);
   });
 });
