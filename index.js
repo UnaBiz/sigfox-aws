@@ -4,7 +4,7 @@
 //  and Ubuntu on Windows for unit testing.
 
 //  region Declarations
-/* eslint-disable camelcase, no-console, no-nested-ternary, global-require, import/no-unresolved, max-len */
+/* eslint-disable max-len,import/newline-after-import,no-nested-ternary */
 //  This is needed because Node.js doesn't cache DNS lookups and will cause DNS quota to be exceeded.
 require('dnscache')({ enable: true });
 
@@ -16,7 +16,7 @@ require('dotenv').load();
 //  because the connections may expire when running for a long time
 
 const functionName = 'unknown_function';
-const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
+const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.  TODO: AWS
 const util = require('util');
 const uuidv4 = require('uuid/v4');
 const stringify = require('json-stringify-safe');
@@ -24,6 +24,42 @@ const stringify = require('json-stringify-safe');
 const cloudCredentials = {};
 const logName = process.env.LOGNAME || 'sigfox-aws';  //  Name of the log to write to.
 const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGTH, 10) : 40;  //  Width of the left column in logs
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region AWS-Specific Functions
+
+const queueURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
+
+const AWS = require('aws-sdk');
+const SQS = new AWS.SQS({ apiVersion: '2012-11-05' });
+
+function awsSendMessage(req, topic, msg) {
+  //  Send the text message to the AWS Simple Queue System queue name.
+  const msgObj = JSON.parse(msg);
+  const url = `${queueURL}/${topic}`;
+  const params = {
+    MessageBody: msg,
+    QueueUrl: url,
+    DelaySeconds: 0,
+    MessageAttributes: {
+      device: {
+        DataType: 'String',
+        StringValue: msgObj.device || 'missing_device',
+      },
+    },
+  };
+  module.exports.log(req, 'awsSendMessage', { topic, url, msgObj, params });
+  return SQS.sendMessage(params).promise()
+    .then(result => module.exports.log(req, 'awsSendMessage', { result, topic, url, msgObj, params }))
+    .catch((error) => { module.exports.error(req, 'awsSendMessage', { error, topic, url, msgObj, params }); throw error; });
+}
+
+//  TODO
+const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
+  startSpan: (/* rootSpanName, labels */) => ({ end: () => ({}) }),  //  Stub
+  end: () => ({}),  //  Stub
+};
+const tracing = { startTrace: () => rootTraceStub };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Utility Functions
@@ -111,13 +147,6 @@ function getSpanName(req) {
     : 'missing_seqNumber';
   return [device, seqNumber].join(' seq:');
 }
-
-//  TODO
-const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-  startSpan: (/* rootSpanName, labels */) => ({ end: () => ({}) }),  //  Stub
-  end: () => ({}),  //  Stub
-};
-const tracing = { startTrace: () => rootTraceStub };
 
 function startRootSpan(req, rootTrace0) {
   //  Start a root-level trace and span to trace the request across Cloud Functions.
@@ -562,7 +591,8 @@ function publishMessage(req, oldMessage, device, type) {
     publisher: () => ({
       publish: (buffer) => {
         console.log('publish queue', { topicName, buffer: buffer.toString() });
-        return Promise.resolve({});
+        return awsSendMessage(req, topicName, buffer.toString())
+          .catch((error) => { throw error; });
       },
     }),
   };

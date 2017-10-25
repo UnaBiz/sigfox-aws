@@ -22,6 +22,7 @@
     "node": ">=7.8.0"
   },
   "dependencies": {
+    "aws-sdk": "^2.140.0",
     "dnscache": "^1.0.1",
     "dotenv": "^4.0.0",
     "json-stringify-safe": "^5.0.1",
