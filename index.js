@@ -29,22 +29,65 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  region AWS-Specific Functions
 
 //  TODO: Read from cloud metadata.
-const queueURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
+//  AWS SQS queues have this prefix.
+const awsSQSURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
+//  AWS IoT Endpoint can be found here: https://ap-southeast-1.console.aws.amazon.com/iotv2/home?region=ap-southeast-1#/settings
+const awsIoTEndpoint = 'A1P01IYM2DOZA0.iot.us-west-2.amazonaws.com';
 
 const AWS = require('aws-sdk');
 const SQS = new AWS.SQS({ apiVersion: '2012-11-05' });
+const IotData = new AWS.IotData({ endpoint: awsIoTEndpoint });
 
 function awsReportError(/* err, action, para */) {
   //  TODO
 }
 
-function awsSendMessage(req, topic0, msg) {
+// eslint-disable-next-line no-unused-vars
+function awsUpdateDeviceState(req, device, state) {
+  //  Update the device/thing state.  Returns a promise.
+  //  Device must be lower case.
+  //  eslint-disable-next-line no-param-reassign
+  if (device) device = device.toLowerCase();
+  const payload = {
+    state: {
+      reported: state,
+    },
+  };
+  let timestamp = Date.now();
+  //  Timestamp is a string in microseconds.  Convert to local time.
+  if (payload.state.reported.timestamp) {
+    timestamp = parseInt(payload.state.reported.timestamp, 10);
+  }
+  const localtime = timestamp + (8 * 60 * 60 * 1000);  //  SG time is GMT+8 hours.
+  payload.state.reported.timestamp = new Date(localtime).toISOString().replace('Z', '');
+  const params = {
+    payload: JSON.stringify(payload),
+    thingName: device,
+  };
+  console.log({ updateThingShadow: params });
+  return IotData.updateThingShadow(params).promise();
+}
+
+function awsSendIoTMessage(req, topic0, payload) {
+  //  Send the text message to the AWS IoT MQTT queue name.
+  //  In Google Cloud topics are named like sigfox.types.all.  We need to rename them
+  //  to AWS MQTT format like sigfox/types/all.
+  const payloadObj = JSON.parse(payload);
+  const topic = (topic0 || '').split('.').join('/');
+  const params = { topic, payload, qos: 0 };
+  module.exports.log(req, 'awsSendIoTMessage', { topic, payloadObj, params });
+  return IotData.publish(params).promise()
+    .then(result => module.exports.log(req, 'awsSendIoTMessage', { result, topic, payloadObj, params }))
+    .catch((error) => { module.exports.error(req, 'awsSendIoTMessage', { error, topic, payloadObj, params }); throw error; });
+}
+
+function awsSendSQSMessage(req, topic0, msg) {
   //  Send the text message to the AWS Simple Queue Service queue name.
   //  In Google Cloud topics are named like sigfox.types.all.  We need to rename them
-  //  to AWS format like sigfox-types-all.
+  //  to AWS SQS format like sigfox-types-all.
   const msgObj = JSON.parse(msg);
   const topic = (topic0 || '').split('.').join('-');
-  const url = `${queueURL}/${topic}`;
+  const url = `${awsSQSURL}/${topic}`;
   const params = {
     MessageBody: msg,
     QueueUrl: url,
@@ -56,19 +99,22 @@ function awsSendMessage(req, topic0, msg) {
       },
     },
   };
-  module.exports.log(req, 'awsSendMessage', { topic, url, msgObj, params });
+  module.exports.log(req, 'awsSendSQSMessage', { topic, url, msgObj, params });
   return SQS.sendMessage(params).promise()
-    .then(result => module.exports.log(req, 'awsSendMessage', { result, topic, url, msgObj, params }))
-    .catch((error) => { module.exports.error(req, 'awsSendMessage', { error, topic, url, msgObj, params }); throw error; });
+    .then(result => module.exports.log(req, 'awsSendSQSMessage', { result, topic, url, msgObj, params }))
+    .catch((error) => { module.exports.error(req, 'awsSendSQSMessage', { error, topic, url, msgObj, params }); throw error; });
 }
 
 function awsGetTopic(req, projectId, topicName) {
-  //  Return the AWS Simple Queue Service queue with that name for that project.  Will be used for
-  //  publishing messages, not reading.
+  //  Return the AWS IoT MQTT Queue and AWS Simple Queue Service queue with that name
+  //  for that project.  Will be used for publishing messages, not reading.
   const topic = {
     topic: topicName,
     publisher: () => ({
-      publish: buffer => awsSendMessage(req, topicName, buffer.toString())
+      publish: buffer => Promise.all([
+        awsSendIoTMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
+        awsSendSQSMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
+      ])
         .catch((error) => { throw error; }),
     }),
   };
