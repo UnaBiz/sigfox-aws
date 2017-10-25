@@ -16,34 +16,36 @@
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
 
-/* eslint-disable quote-props,quotes,comma-dangle */
-const package_json = {
-  "name": "sigfoxCallback",
-  "version": "0.0.1",
-  "author": {
-    "name": "Lee Lup Yuen",
-    "email": "ly.lee@unabiz.com",
-    "url": "http://github.com/unabiz/"
-  },
-  "license": "MIT",
-  "engines": {
-    "node": ">=6.7.0"
-  },
-  "dependencies": {
-    "dnscache": "^1.0.1",
-    "dotenv": "^4.0.0",
-    "sigfox-aws": ">=0.0.1",
-    "safe-buffer": "5.0.1",
-    "node-fetch": "^1.6.3",
-    "json-stringify-safe": "^5.0.1",
-    "uuid": "^3.1.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
+const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
+
+  {
+    "name": "sigfoxCallback",
+    "version": "0.0.1",
+    "author": {
+      "name": "Lee Lup Yuen",
+      "email": "ly.lee@unabiz.com",
+      "url": "http://github.com/unabiz/"
+    },
+    "license": "MIT",
+    "engines": {
+      "node": ">=6.7.0"
+    },
+    "dependencies": {
+      "dnscache": "^1.0.1",
+      "dotenv": "^4.0.0",
+      "sigfox-aws": "UnaBiz/sigfox-aws",
+      "safe-buffer": "5.0.1",
+      "node-fetch": "^1.6.3",
+      "json-stringify-safe": "^5.0.1",
+      "uuid": "^3.1.0"
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
+    }
   }
-};
-/* eslint-enable quote-props,quotes,comma-dangle */
+
+; /* eslint-enable quote-props,quotes,comma-dangle,indent */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS Lambda Startup
