@@ -29,8 +29,6 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  region AWS-Specific Functions
 
 //  TODO: Read from cloud metadata.
-//  AWS SQS queues have this prefix.
-const awsSQSURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
 //  AWS IoT Endpoint can be found here: https://ap-southeast-1.console.aws.amazon.com/iotv2/home?region=ap-southeast-1#/settings
 const awsIoTEndpoint = 'a1p01iym2doza0.iot.ap-southeast-1.amazonaws.com';
 
@@ -39,6 +37,7 @@ if (!isProduction) AWS.config.loadFromPath('./aws-credentials.json');
 
 const SQS = new AWS.SQS();
 const IotData = new AWS.IotData({ endpoint: awsIoTEndpoint });
+// const Iot = new AWS.Iot();
 
 function awsReportError(/* err, action, para */) {
   //  TODO
@@ -89,7 +88,7 @@ function awsSendSQSMessage(req, topic0, msg) {
   //  to AWS SQS format like sigfox-types-all.
   const msgObj = JSON.parse(msg);
   const topic = (topic0 || '').split('.').join('-');
-  const url = `${awsSQSURL}/${topic}`;
+  const url = `${SQS.endpoint.href}${topic}`;
   const params = {
     MessageBody: msg,
     QueueUrl: url,
