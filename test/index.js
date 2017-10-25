@@ -1,5 +1,5 @@
 //  Unit Test
-/* global describe:true, it:true, beforeEach:true */
+/* global describe:true, it:true, beforeEach:true, afterEach:true */
 /* eslint-disable max-len, import/no-extraneous-dependencies, no-console, no-unused-vars, one-var, no-underscore-dangle */
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
@@ -83,15 +83,25 @@ describe(moduleName, () => {
     req = { unittest: true };
   });
 
+  afterEach(() => {
+    return moduleTested.flushLog(req);
+  });
+
   it('should log', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { result: 'OK', number: 789, obj: { level1: { level2: {} } }, msg });
-    return moduleTested.flushLog(req);
+    return Promise.resolve('OK');
   });
 
   it('should log errors', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { error: new Error('This is the error message'), number: 789, obj: { level1: { level2: {} } }, msg });
-    return moduleTested.flushLog(req);
+    return Promise.resolve('OK');
+  });
+
+  it('should publish message', () => {
+    const msg = getTestMessage('number', testDevice1);
+    const type = 'testtype';
+    return moduleTested.publishMessage(req, msg, null, type);
   });
 });

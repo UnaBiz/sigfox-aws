@@ -557,7 +557,15 @@ function publishMessage(req, oldMessage, device, type) {
   //  eslint-disable-next-line global-require
   //  TODO: Stub!!!
   //  const topic = require('@google-cloud/pubsub')(credentials).topic(topicName);
-  const topic = 'missing_topic';
+  const topic = {
+    topic: topicName,
+    publisher: () => ({
+      publish: (buffer) => {
+        console.log('publish queue', { topicName, buffer: buffer.toString() });
+        return Promise.resolve({});
+      },
+    }),
+  };
 
   let message = Object.assign({}, oldMessage,
     device ? { device: (device === 'all') ? oldMessage.device : device }
