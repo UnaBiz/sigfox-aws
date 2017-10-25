@@ -83,6 +83,7 @@ describe(moduleName, () => {
     req = { unittest: true };
   });
 
+  // eslint-disable-next-line arrow-body-style
   afterEach(() => {
     return moduleTested.flushLog(req);
   });
@@ -101,7 +102,6 @@ describe(moduleName, () => {
 
   it('should publish message', () => {
     const msg = getTestMessage('number', testDevice1);
-    const type = 'all';
-    return moduleTested.publishMessage(req, msg, null, type);
+    return moduleTested.publishMessage(req, msg, 'all', null);
   });
 });

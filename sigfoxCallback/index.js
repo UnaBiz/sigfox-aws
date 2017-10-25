@@ -3,7 +3,7 @@
 //  Name: sigfoxCallback
 //  Memory: 512 MB
 //  Timeout: 1 min
-//  Existing Role: lambda_base_execution
+//  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
 //  Debugging: Enable active tracing
 //  Environment Variables: NODE_ENV=production
 
@@ -18,9 +18,6 @@
 //  Create the queue "sigfox-devices-all"
 //  Default Visibility Timeout: 0 seconds
 //  Message Retention Period: 1 day
-
-//  Ensure that lambda_base_execution role has access to the queue:
-//  Grant "AmazonSQSFullAccess" to lambda_base_execution role.
 
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.

@@ -1,6 +1,6 @@
 .idea
-**/.env
-**/google-credentials*
+**/.env*
+**/*-credentials*.json
 **/yarn.lock
 **/node_modules
 **/database.sqlite

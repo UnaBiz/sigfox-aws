@@ -32,10 +32,12 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  AWS SQS queues have this prefix.
 const awsSQSURL = 'https://sqs.ap-southeast-1.amazonaws.com/595779189490';
 //  AWS IoT Endpoint can be found here: https://ap-southeast-1.console.aws.amazon.com/iotv2/home?region=ap-southeast-1#/settings
-const awsIoTEndpoint = 'A1P01IYM2DOZA0.iot.us-west-2.amazonaws.com';
+const awsIoTEndpoint = 'a1p01iym2doza0.iot.ap-southeast-1.amazonaws.com';
 
 const AWS = require('aws-sdk');
-const SQS = new AWS.SQS({ apiVersion: '2012-11-05' });
+if (!isProduction) AWS.config.loadFromPath('./aws-credentials.json');
+
+const SQS = new AWS.SQS();
 const IotData = new AWS.IotData({ endpoint: awsIoTEndpoint });
 
 function awsReportError(/* err, action, para */) {
