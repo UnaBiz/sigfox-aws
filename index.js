@@ -28,19 +28,29 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS-Specific Functions
 
-//  TODO: Read from cloud metadata.
-//  AWS IoT Endpoint can be found here: https://ap-southeast-1.console.aws.amazon.com/iotv2/home?region=ap-southeast-1#/settings
-const awsIoTEndpoint = 'a1p01iym2doza0.iot.ap-southeast-1.amazonaws.com';
-
-const AWS = require('aws-sdk');
-if (!isProduction) AWS.config.loadFromPath('./aws-credentials.json');
-
+const AWS = require('aws-sdk'); if (!isProduction) AWS.config.loadFromPath('./aws-credentials.json');
 const SQS = new AWS.SQS();
-const IotData = new AWS.IotData({ endpoint: awsIoTEndpoint });
-// const Iot = new AWS.Iot();
+const Iot = new AWS.Iot();
+let awsIoTDataPromise = null;
 
 function awsReportError(/* err, action, para */) {
   //  TODO
+}
+
+function awsGetIoTData(/* req */) {
+  //  Return a promise for the IotData object for updating message queue
+  //  and device state.
+  if (awsIoTDataPromise) return awsIoTDataPromise;
+  awsIoTDataPromise = Iot.describeEndpoint({}).promise()
+    .then((res) => {
+      const IotData = new AWS.IotData({ endpoint: res.endpointAddress });
+      return IotData;
+    })
+    .catch((error) => {
+      awsIoTDataPromise = null;
+      throw error;
+    });
+  return awsIoTDataPromise;
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -66,7 +76,10 @@ function awsUpdateDeviceState(req, device, state) {
     thingName: device,
   };
   console.log({ updateThingShadow: params });
-  return IotData.updateThingShadow(params).promise();
+  return awsGetIoTData(req)
+    .then(IotData => IotData.updateThingShadow(params).promise())
+    .then(result => module.exports.log(req, 'awsUpdateDeviceState', { result, device, state, payload, params }))
+    .catch((error) => { module.exports.error(req, 'awsUpdateDeviceState', { error, device, state, payload, params }); throw error; });
 }
 
 function awsSendIoTMessage(req, topic0, payload) {
@@ -77,7 +90,8 @@ function awsSendIoTMessage(req, topic0, payload) {
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'awsSendIoTMessage', { topic, payloadObj, params });
-  return IotData.publish(params).promise()
+  return awsGetIoTData(req)
+    .then(IotData => IotData.publish(params).promise())
     .then(result => module.exports.log(req, 'awsSendIoTMessage', { result, topic, payloadObj, params }))
     .catch((error) => { module.exports.error(req, 'awsSendIoTMessage', { error, topic, payloadObj, params }); throw error; });
 }
