@@ -790,7 +790,8 @@ function dispatchMessage(req, oldMessage, device) {
   if (!message.route || message.route.length === 0) {
     //  No more steps to dispatch, publish the decoded message.
     log(req, 'dispatchMessage', { result: 'no_route', message, device });
-    return publishDecodedMessage(req, oldMessage, device, message.type);
+    // TODO: return publishDecodedMessage(req, oldMessage, device, message.type);
+    return Promise.resolve(message);
   }
   //  Get the next step and publish the message there.
   //  Don't use shift() because it mutates the original object:

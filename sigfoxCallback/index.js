@@ -54,7 +54,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.12",
+      "sigfox-aws": ">=0.0.16",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",
@@ -233,7 +233,9 @@ function wrap() {
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
     if (body.baseStationTime) {
-      const age = Date.now() - (body.baseStationTime * 1000);
+      const baseStationTime = parseInt(body.baseStationTime, 10);
+      const age = Date.now() - (baseStationTime * 1000);
+      console.log({ baseStationTime });
       if (age > 5 * 60 * 1000) {
         //  If older than 5 mins, reject.
         throw new Error(`too_old: ${age}`);
