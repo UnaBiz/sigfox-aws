@@ -8,6 +8,14 @@
 //  Debugging: Enable active tracing
 //  Environment Variables: NODE_ENV=production
 
+//  Go to AWS IoT, create a Rule:
+//  Name: sigfoxRouteMessage
+//  SQL Version: Beta
+//  Attribute: *
+//  Topic filter: sigfox/received
+//  Condition: (Blank)
+//  Action: Run Lambda Function routeMessage
+
 //  Lambda Function routeMessage is triggered when a Sigfox message is sent
 //  to sigfox.received, the queue for all received messages.
 //  We set the Sigfox message route according to the device ID.
@@ -105,9 +113,10 @@ let defaultRouteExpiry = null;  //  Cache expiry timestamp.
 //  region Portable Code for Google Cloud and AWS
 
 function wrap() {
-  //  Wrap the module into a function so that all Google Cloud resources are properly disposed.
-//  Enable DNS cache in case we hit the DNS quota for Google Cloud Functions.
-  require('dnscache')({ enable: true });
+  //  Wrap the module into a function so that all we defer loading of dependencies,
+  //  and ensure that cloud resources are properly disposed.
+
+  require('dnscache')({ enable: true });  //  Enable DNS cache in case we hit the DNS quota
   const scloud = require('sigfox-aws'); //  sigfox-aws Framework
   const stringify = require('json-stringify-safe');
 
