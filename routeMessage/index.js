@@ -6,7 +6,9 @@
 //  Timeout: 1 min
 //  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
 //  Debugging: Enable active tracing
-//  Environment Variables: NODE_ENV=production
+//  Environment Variables:
+//  NODE_ENV=production
+//  SIGFOX_ROUTE=decodeStructuredMessage
 
 //  Go to AWS IoT, create a Rule:
 //  Name: sigfoxRouteMessage
@@ -66,10 +68,12 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS-Specific Functions
 
+if (!process.env.SIGFOX_ROUTE) throw new Error('Environment variable SIGFOX_ROUTE must be defined');
+
 const awsmetadata = { // eslint-disable-next-line no-unused-vars
   authorize: req => Promise.resolve({}),
   //  TODO: Get from SigfoxConfig
-  getProjectMetadata: (/* req, authClient */) => Promise.resolve({ 'sigfox-route': 'decodeStructuredMessage' }),
+  getProjectMetadata: (/* req, authClient */) => Promise.resolve({ 'sigfox-route': process.env.SIGFOX_ROUTE }),
   convertMetadata: (req, metadata) => Promise.resolve(metadata),
 };
 
