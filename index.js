@@ -846,7 +846,8 @@ function main(event, task) {
   //  by the caller to process the Sigfox message.  Then dispatch the next step of
   //  the route in the message, set by routeMessage.
   //  task should have the signature task(req, device, body, message).
-  //  event contains
+  //  For AWS, event is the message itself.
+  //  For Google Cloud, event contains
   //  { eventType: "providers/cloud.pubsub/eventTypes/topic.publish"
   //    resource: "projects/myproject/topics/sigfox.devices.all"
   //    timestamp: "2017-05-06T10:19:29.666Z"
@@ -854,7 +855,8 @@ function main(event, task) {
   //    eventId: "120816659675797" }
   const req = { starttime: Date.now(), event };  //  Record start time.
   //  Decode the base64 message.
-  const message = JSON.parse(Buffer.from(event.data.data, 'base64').toString());
+  const message = event.body ? event  //  AWS
+    : JSON.parse(Buffer.from(event.data.data, 'base64').toString());  //  Google Cloud
   const device = message ? message.device : null;
   const body = message ? message.body : null;
   const rootTraceId = message.rootTraceId || null;

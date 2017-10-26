@@ -1,6 +1,7 @@
-//  Installation Instructions:
+//  sigfoxCallback Installation Instructions:
 //  Copy and paste the entire contents of this file into a Lambda Function
 //  Name: sigfoxCallback
+//  Runtime: Node.js 6.10
 //  Memory: 512 MB
 //  Timeout: 1 min
 //  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
@@ -15,7 +16,7 @@
 //  Stage: prod
 
 //  Go to AWS Simple Queue Service Console:
-//  Create the queue "sigfox-devices-all"
+//  Create the queues "sigfox-received", "sigfox-devices-all"
 //  Default Visibility Timeout: 0 seconds
 //  Message Retention Period: 1 day
 
@@ -56,7 +57,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.11",
+      "sigfox-aws": ">=0.0.12",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",

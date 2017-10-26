@@ -1,6 +1,7 @@
-//  Installation Instructions:
+//  routeMessage Installation Instructions:
 //  Copy and paste the entire contents of this file into a Lambda Function
 //  Name: routeMessage
+//  Runtime: Node.js 6.10
 //  Memory: 512 MB
 //  Timeout: 1 min
 //  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
@@ -8,7 +9,7 @@
 //  Environment Variables: NODE_ENV=production
 
 //  Lambda Function routeMessage is triggered when a Sigfox message is sent
-//  to sigfox.devices.all, the queue for all devices.
+//  to sigfox.received, the queue for all received messages.
 //  We set the Sigfox message route according to the device ID.
 //  The route is stored in the SigfoxConfig AWS IoT device attributes.
 
@@ -40,7 +41,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
       "dependencies": {
         "dnscache": "^1.0.1",
         "dotenv": "^4.0.0",
-        "sigfox-aws": ">=0.0.11",
+        "sigfox-aws": ">=0.0.12",
         "safe-buffer": "5.0.1",
         "node-fetch": "^1.6.3",
         "json-stringify-safe": "^5.0.1",
@@ -96,14 +97,6 @@ function prepareRequest(body) {
 // eslint-disable-next-line arrow-body-style
 exports.handler = (event, context, callback) => {
   console.log(JSON.stringify({ event, env: process.env }, null, 2));
-  //  We will call "done" to return a JSON response.
-  const done = (err, res) => callback(null, {
-    statusCode: err ? '400' : '200',
-    body: err ? err.message : JSON.stringify(res),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
 
   //  Install the dependencies from package_json above.  Will reload the script.
   //  eslint-disable-next-line no-use-before-define
@@ -113,20 +106,18 @@ exports.handler = (event, context, callback) => {
 
       //  Dependencies loaded, so we can use require here.
       //  Prepare the request and result objects.
-      const body = JSON.parse(event.body);
-      prepareRequest(body);  //  eslint-disable-next-line no-use-before-define
-      return wrap().main(mainReq, mainRes)
-        .then(() => done(null, 'OK'))
-        .catch(error => done(error, null));
+      //  const body = JSON.parse(event.body);
+      //  prepareRequest(body);
+      //  eslint-disable-next-line no-use-before-define
+      return main(event)
+        .then(result => callback(null, result))
+        .catch(error => callback(error, null));
     })
-    .catch(error => done(error, null));
+    .catch(error => callback(error, null));
 };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Portable Code for Google Cloud and AWS
-
-//  //////////////////////////////////////////////////////////////////////////////////////////
-//  Begin Common Declarations
+//  region Portable Declarations for Google Cloud and AWS
 
 //  A route is an array of strings.  Each string indicates the next processing step,
 //  e.g. ['decodeStructuredMessage', 'logToGoogleSheets'].
@@ -138,8 +129,8 @@ const routeExpiry = 10 * 1000;  //  Routes expire in 10 seconds.
 let defaultRoute = null;        //  The cached route.
 let defaultRouteExpiry = null;  //  Cache expiry timestamp.
 
-//  //////////////////////////////////////////////////////////////////////////////////////////
-//  Begin Message Processing Code
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Portable Code for Google Cloud and AWS
 
 function wrap() {
   //  Wrap the module into a function so that all Google Cloud resources are properly disposed.
@@ -228,6 +219,19 @@ function wrap() {
     //  When this Google Cloud Function is triggered, we call main() which calls task().
     serveQueue: event => scloud.main(event, task),
   };
+}
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Main Function
+
+function main(event) {
+  //  Create a wrapper and serve the PubSub event.
+  let wrapper = wrap();
+  return wrapper.serveQueue(event)
+  //  Dispose the wrapper and all resources inside.
+    .then((result) => { wrapper = null; return result; })
+    //  Suppress the error or Cloud will call the function again.
+    .catch((error) => { wrapper = null; return error; });
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
