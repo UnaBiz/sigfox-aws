@@ -232,6 +232,13 @@ function wrap() {
     const rootTraceId = msg.rootTraceId;
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
+    if (body.baseStationTime) {
+      const age = Date.now() - (body.baseStationTime * 1000);
+      if (age > 5 * 60 * 1000) {
+        //  If older than 5 mins, reject.
+        throw new Error(`too_old: ${age}`);
+      }
+    }
     let result = null;
     //  Send the Sigfox message to the sigfox.received queue.
     return saveMessage(req, device, type, body, rootTraceId)
