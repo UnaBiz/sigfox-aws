@@ -1,27 +1,132 @@
-//  Google Cloud Function routeMessage is trigger when a Sigfox message is sent
-//  to sigfox.devices.all, the Google PubSub queue for all devices.
+//  Installation Instructions:
+//  Copy and paste the entire contents of this file into a Lambda Function
+//  Name: routeMessage
+//  Memory: 512 MB
+//  Timeout: 1 min
+//  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
+//  Debugging: Enable active tracing
+//  Environment Variables: NODE_ENV=production
+
+//  Lambda Function routeMessage is triggered when a Sigfox message is sent
+//  to sigfox.devices.all, the queue for all devices.
 //  We set the Sigfox message route according to the device ID.
-//  The route is stored in the Google Cloud Metadata store.
+//  The route is stored in the SigfoxConfig AWS IoT device attributes.
 
 //  Try not to call any database that may cause this function to fail
 //  under heavy load.  High availability of this Cloud Function is
 //  essential in order to route every Sigfox message properly.
 
+/* eslint-disable max-len, camelcase, no-console, no-nested-ternary, import/no-dynamic-require,import/newline-after-import, import/no-unresolved, global-require  */
+process.on('uncaughtException', err => console.error(err.message, err.stack));  //  Display uncaught exceptions.
+process.on('unhandledRejection', (reason, p) => console.error('Unhandled Rejection at:', p, 'reason:', reason));
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
+
+const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
+//  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
+    {
+      "name": "routeMessage",
+      "version": "0.0.1",
+      "author": {
+        "name": "Lee Lup Yuen",
+        "email": "ly.lee@unabiz.com",
+        "url": "http://github.com/unabiz/"
+      },
+      "license": "MIT",
+      "engines": {
+        "node": ">=6.7.0"
+      },
+      "dependencies": {
+        "dnscache": "^1.0.1",
+        "dotenv": "^4.0.0",
+        "sigfox-aws": ">=0.0.9",
+        "safe-buffer": "5.0.1",
+        "node-fetch": "^1.6.3",
+        "json-stringify-safe": "^5.0.1",
+        "uuid": "^3.1.0"
+      },
+      "repository": {
+        "type": "git",
+        "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
+      }
+    }
+//  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
+; /* eslint-enable quote-props,quotes,comma-dangle,indent */
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region AWS-Specific Functions
+
+const awsmetadata = { // eslint-disable-next-line no-unused-vars
+  authorize: req => ({}), // eslint-disable-next-line no-unused-vars
+  getProjectMetadata: (req, authClient) => ({ 'sigfox-route': 'decodeStructuredMessage' }),  //  TODO: Get from SigfoxConfig
+  convertMetadata: (req, metadata) => metadata,
+};
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region AWS Lambda Startup
+
+const mainReq = {};
+const mainRes = {
+  status: (/* code */) => mainRes,  //  TODO
+  json: (/* json */) => mainRes,  //  TODO
+  end: () => mainRes,
+};
+
+function prepareRequest(body) {
+  //  Prepare the request and result objects.
+  mainReq.body = body;
+  /* mainReq.body looks like {
+    device: '1A2345',
+    data: 'b0513801a421f0019405a500',
+    time: '1507112763',
+    duplicate: 'false',
+    snr: '18.86',
+    station: '1D44',
+    avgSnr: '15.54',
+    lat: '1',
+    lng: '104',
+    rssi: '-123.00',
+    seqNumber: '1508',
+    ack: 'false',
+    longPolling: 'false',
+  }; */
+}
+
+// eslint-disable-next-line arrow-body-style
+exports.handler = (event, context, callback) => {
+  console.log(JSON.stringify({ event, env: process.env }, null, 2));
+  //  We will call "done" to return a JSON response.
+  const done = (err, res) => callback(null, {
+    statusCode: err ? '400' : '200',
+    body: err ? err.message : JSON.stringify(res),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  //  Install the dependencies from package_json above.  Will reload the script.
+  //  eslint-disable-next-line no-use-before-define
+  return autoInstall(package_json, event, context, callback)
+    .then((installed) => {
+      if (!installed) return null;  //  Dependencies installing now.  Wait until this Lambda reloads.
+
+      //  Dependencies loaded, so we can use require here.
+      //  Prepare the request and result objects.
+      const body = JSON.parse(event.body);
+      prepareRequest(body);  //  eslint-disable-next-line no-use-before-define
+      return wrap().main(mainReq, mainRes)
+        .then(() => done(null, 'OK'))
+        .catch(error => done(error, null));
+    })
+    .catch(error => done(error, null));
+};
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Portable Code for Google Cloud and AWS
+
 //  //////////////////////////////////////////////////////////////////////////////////////////
 //  Begin Common Declarations
-
-/* eslint-disable camelcase, no-console, no-nested-ternary, import/no-dynamic-require,
- import/newline-after-import, import/no-unresolved, global-require, max-len */
-//  Enable DNS cache in case we hit the DNS quota for Google Cloud Functions.
-require('dnscache')({ enable: true });
-process.on('uncaughtException', err => console.error(err.message, err.stack));  //  Display uncaught exceptions.
-if (process.env.FUNCTION_NAME) {
-  //  Load the Google Cloud Trace and Debug Agents before any require().
-  //  Only works in Cloud Function.
-  require('@google-cloud/trace-agent').start();
-  require('@google-cloud/debug-agent').start();
-}
-const stringify = require('json-stringify-safe');
 
 //  A route is an array of strings.  Each string indicates the next processing step,
 //  e.g. ['decodeStructuredMessage', 'logToGoogleSheets'].
@@ -33,16 +138,15 @@ const routeExpiry = 10 * 1000;  //  Routes expire in 10 seconds.
 let defaultRoute = null;        //  The cached route.
 let defaultRouteExpiry = null;  //  Cache expiry timestamp.
 
-//  End Common Declarations
-//  //////////////////////////////////////////////////////////////////////////////////////////
-
 //  //////////////////////////////////////////////////////////////////////////////////////////
 //  Begin Message Processing Code
 
 function wrap() {
   //  Wrap the module into a function so that all Google Cloud resources are properly disposed.
-  const sgcloud = require('sigfox-gcloud'); //  sigfox-gcloud Framework
-  const googlemetadata = require('sigfox-gcloud/lib/google-metadata');
+//  Enable DNS cache in case we hit the DNS quota for Google Cloud Functions.
+  require('dnscache')({ enable: true });
+  const scloud = require('sigfox-aws'); //  sigfox-aws Framework
+  const stringify = require('json-stringify-safe');
 
   function getRoute(req) {
     //  Fetch the route from the Google Cloud Metadata store, which is easier
@@ -57,13 +161,13 @@ function wrap() {
     let authClient = null;
     let metadata = null;
     //  Get a Google auth client.
-    return googlemetadata.authorize(req)
+    return awsmetadata.authorize(req)
       .then((res) => { authClient = res; })
       //  Get the project metadata.
-      .then(() => googlemetadata.getProjectMetadata(req, authClient))
+      .then(() => awsmetadata.getProjectMetadata(req, authClient))
       .then((res) => { metadata = res; })
       //  Convert the metadata to a JavaScript object.
-      .then(() => googlemetadata.convertMetadata(req, metadata))
+      .then(() => awsmetadata.convertMetadata(req, metadata))
       //  Return the default route from the metadata.
       .then(metadataObj => metadataObj[defaultRouteKey])
       .then((res) => {
@@ -73,11 +177,11 @@ function wrap() {
         const result = res.split(' ').join('').split(',');  //  Remove spaces.
         defaultRoute = result;
         defaultRouteExpiry = Date.now() + routeExpiry;
-        sgcloud.log(req, 'getRoute', { result, device: req.device });
+        scloud.log(req, 'getRoute', { result, device: req.device });
         return result;
       })
       .catch((error) => {
-        sgcloud.log(req, 'getRoute', { error, device: req.device });
+        scloud.log(req, 'getRoute', { error, device: req.device });
         //  In case of error, reuse the previous route if any.
         if (defaultRoute) return defaultRoute;
         throw error;
@@ -99,11 +203,11 @@ function wrap() {
         //  Must clone the route because it might be mutated accidentally.
         msg.route = JSON.parse(stringify(route || []));
         const result = msg;
-        sgcloud.log(req, 'routeMessage', { result, route, device, body, msg });
+        scloud.log(req, 'routeMessage', { result, route, device, body, msg });
         return result;
       })
       .catch((error) => {
-        sgcloud.log(req, 'routeMessage', { error, device, body, msg });
+        scloud.log(req, 'routeMessage', { error, device, body, msg });
         throw error;
       });
   }
@@ -114,7 +218,7 @@ function wrap() {
     //  The route is saved into the "route" field of the Sigfox message.
     return routeMessage(req, device, body, msg)
       .catch((error) => {
-        sgcloud.log(req, 'task', { error, device, body, msg });
+        scloud.log(req, 'task', { error, device, body, msg });
         throw error;
       });
   }
@@ -122,30 +226,41 @@ function wrap() {
   return {
     //  Expose these functions outside of the wrapper.
     //  When this Google Cloud Function is triggered, we call main() which calls task().
-    serveQueue: event => sgcloud.main(event, task),
+    serveQueue: event => scloud.main(event, task),
   };
 }
 
-//  End Message Processing Code
-//  //////////////////////////////////////////////////////////////////////////////////////////
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Standard Code for AutoInstall.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
 
-//  //////////////////////////////////////////////////////////////////////////////////////////
-//  Main Function
+/* eslint-disable curly, brace-style, import/no-absolute-path */
+let autoinstallPromise = null;  //  Cached autoinstall module.
+function autoInstall(package_json0, event0, context0, callback0) {
+  //  Set up autoinstall to install any NPM dependencies.  Returns a promise
+  //  for "true" when the autoinstall has completed and the script has relaunched.
+  //  Else return a promise for "false" to indicate that dependencies are being installed.
+  if (__filename.indexOf('/tmp') === 0) return Promise.resolve(true);
+  const sourceCode = require('fs').readFileSync(__filename);
+  if (!autoinstallPromise) autoinstallPromise = new Promise((resolve, reject) => {
+    //  Copy autoinstall.js from GitHub to /tmp and load the module.
+    //  TODO: If script already in /tmp, use it.  Else download from GitHub.
+    require('https').get(`https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js?random=${Date.now()}`, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; }); // Accumulate the data chunks.
+      res.on('end', () => { //  After downloading from GitHub, save to /tmp amd load the module.
+        require('fs').writeFileSync('/tmp/autoinstall.js', body);
+        return resolve(require('/tmp/autoinstall')); }); })
+      .on('error', (err) => { autoinstallPromise = null; console.error('setupAutoInstall failed', err.message, err.stack); return reject(err); }); });
+  return autoinstallPromise
+    .then(mod => mod.install(package_json0, event0, context0, callback0, sourceCode))
+    .then(() => false)
+    .catch((error) => { throw error; });
+} /* eslint-enable curly, brace-style, import/no-absolute-path */
 
-module.exports = {
-  //  Expose these functions to be called by Google Cloud Function.
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Expected Output
 
-  main: (event) => {
-    //  Create a wrapper and serve the PubSub event.
-    let wrapper = wrap();
-    return wrapper.serveQueue(event)
-      .then((result) => {
-        wrapper = null;  //  Dispose the wrapper and all resources inside.
-        return result;
-      })
-      .catch((error) => {
-        wrapper = null;  //  Dispose the wrapper and all resources inside.
-        return error;  //  Suppress the error or Google Cloud will call the function again.
-      });
-  },
-};
+/*
+*/
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion

@@ -33,6 +33,8 @@
 //  kept as simple as possible to reduce the chance of failure.
 
 /* eslint-disable camelcase, no-console, no-nested-ternary, import/no-dynamic-require, import/newline-after-import, import/no-unresolved, global-require, max-len */
+process.on('uncaughtException', err => console.error(err.message, err.stack));  //  Display uncaught exceptions.
+process.on('unhandledRejection', (reason, p) => console.error('Unhandled Rejection at:', p, 'reason:', reason));
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
@@ -135,10 +137,8 @@ function wrap() {
   //  and ensure that cloud resources are properly disposed.
 
   require('dnscache')({ enable: true });  //  Enable DNS cache in case we hit the DNS quota
-  process.on('uncaughtException', err => console.error(err.message, err.stack));  //  Display uncaught exceptions.
-  process.on('unhandledRejection', (reason, p) => console.error('Unhandled Rejection at:', p, 'reason:', reason));
-  const uuid = require('uuid');
   const scloud = require('sigfox-aws'); //  sigfox-aws Framework
+  const uuid = require('uuid');
 
   function getResponse(req, device0, body /* , msg */) {
     //  Compose the callback response to Sigfox Cloud and return as a promise.
