@@ -659,6 +659,7 @@ function publishMessage(req, oldMessage, device, type) {
   //  Publish the message to the device or message type queue in PubSub.
   //  If device is non-null, publish to sigfox.devices.<<device>>
   //  If type is non-null, publish to sigfox.types.<<type>>
+  //  If device and type are both null, publish to sigfox.received.
   //  If message contains options.unpackBody=true, then send message.body as the root of the
   //  message.  This is used for sending log messages to BigQuery via Google Cloud DataFlow.
   //  The caller must have called server/bigquery/validateLogSchema.
@@ -668,7 +669,7 @@ function publishMessage(req, oldMessage, device, type) {
     ? `sigfox.devices.${device}`
     : type
       ? `sigfox.types.${type}`
-      : 'sigfox.devices.missing_device';
+      : 'sigfox.received';
   const res = module.exports.transformRoute(req, type, device, cloudCredentials, topicName0);
   const credentials = res.credentials;
   const topicName = res.topicName;
@@ -680,7 +681,7 @@ function publishMessage(req, oldMessage, device, type) {
   let message = Object.assign({}, oldMessage,
     device ? { device: (device === 'all') ? oldMessage.device : device }
       : type ? { type }
-      : { device: 'missing_device' });
+      : { device: oldMessage.device });
   if (device === 'all') message.device = oldMessage.device;
 
   //  If message contains options.unpackBody=true, then send message.body as the root of the
@@ -739,6 +740,41 @@ function updateMessageHistory(req, oldMessage) {
   return message;
 }
 
+function publishDecodedMessage(req, message0, device, type) {
+  //  Save the message to in 3 message queues:
+  //  (1) sigfox.devices.all (the queue for all devices)
+  //  (2) sigfox.devices.<deviceID> (the device specific queue)
+  //  (3) sigfox.types.<deviceType> (the specific device type e.g. gps)
+  //  There may be another Cloud Function waiting on sigfox.devices.all
+  //  to process this message e.g. routeMessage.
+  //  Where does type come from?  It's specified in the callback URL
+  //  e.g. https://myproject.appspot.com?type=gps
+  log(req, 'publishDecodedMessage', { device, type });
+  const queues = [
+    { device },  //  sigfox.devices.<deviceID> (the device specific queue)
+    { device: 'all' },  //  sigfox.devices.all (the queue for all devices)
+  ];
+  if (type) queues.push({ type });  //  sigfox.types.<deviceType>
+  const message = updateMessageHistory(req, message0, device);
+  //  Get a list of promises, one for each publish operation to each queue.
+  const promises = [];
+  for (const queue of queues) {
+    //  Send message to each queue, either the device ID or message type queue.
+    const promise = publishMessage(req, message, queue.device, queue.type)
+      .catch((error) => {
+        log(req, 'publishDecodedMessage', { error, device, type });
+        return error;  //  Suppress the error so other sends can proceed.
+      });
+    promises.push(promise);
+  }
+  //  Wait for the messages to be published to the queues.
+  return Promise.all(promises)
+    //  Return the message with dispatch flag set so we don't resend.
+    .then(() => log(req, 'publishDecodedMessage', { result: message, device, type }))
+    .then(() => Object.assign({}, message, { isDispatched: true }))
+    .catch((error) => { throw error; });
+}
+
 function dispatchMessage(req, oldMessage, device) {
   //  Dispatch the message to the next step in the route of the message.
   //  message contains { device, type, body, query, route }
@@ -752,10 +788,9 @@ function dispatchMessage(req, oldMessage, device) {
   //  Update the message history.
   const message = updateMessageHistory(req, oldMessage);
   if (!message.route || message.route.length === 0) {
-    //  No more steps to dispatch, so exit.
-    const result = message;
-    log(req, 'dispatchMessage', { result, status: 'no_route', message, device });
-    return Promise.resolve(result);
+    //  No more steps to dispatch, publish the decoded message.
+    log(req, 'dispatchMessage', { result: 'no_route', message, device });
+    return publishDecodedMessage(req, oldMessage, device, message.type);
   }
   //  Get the next step and publish the message there.
   //  Don't use shift() because it mutates the original object:

@@ -56,7 +56,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.9",
+      "sigfox-aws": ">=0.0.11",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",
@@ -167,38 +167,15 @@ function wrap() {
   }
 
   function saveMessage(req, device, type, body, rootTraceId) {
-    //  Save the message to in 3 message queues:
-    //  (1) sigfox.devices.all (the queue for all devices)
-    //  (2) sigfox.devices.<deviceID> (the device specific queue)
-    //  (3) sigfox.types.<deviceType> (the specific device type e.g. gps)
-    //  There may be another Cloud Function waiting on sigfox.devices.all
-    //  to process this message e.g. routeMessage.
-    //  Where does type come from?  It's specified in the callback URL
-    //  e.g. https://myproject.appspot.com?type=gps
+    //  Save the message to sigfox.received queue.
     scloud.log(req, 'saveMessage', { device, type, body, rootTraceId });
-    const queues = [
-      { device },  //  sigfox.devices.<deviceID> (the device specific queue)
-      { device: 'all' },  //  sigfox.devices.all (the queue for all devices)
-    ];
-    if (type) queues.push({ type });  //  sigfox.types.<deviceType>
     const query = req.query;
     //  Compose the message and record the history.
     const message0 = { device, type, body, query, rootTraceId };
     const message = scloud.updateMessageHistory(req, message0, device);
-    //  Get a list of promises, one for each publish operation to each queue.
-    const promises = [];
-    for (const queue of queues) {
-      //  Send message to each queue, either the device ID or message type queue.
-      const promise = scloud.publishMessage(req, message, queue.device, queue.type)
-        .catch((error) => {
-          scloud.log(req, 'saveMessage', { error, device, type, body, rootTraceId });
-          return error;  //  Suppress the error so other sends can proceed.
-        });
-      promises.push(promise);
-    }
-    //  Wait for the messages to be published to the queues.
-    return Promise.all(promises)
-    //  Return the message with dispatch flag set so we don't resend.
+    //  Publish the message to the sigfox.received queue.
+    return scloud.publishMessage(req, message, null, null)
+      //  Return the message with dispatch flag set so we don't resend.
       .then(() => scloud.log(req, 'saveMessage', { result: message, device, type, body, rootTraceId }))
       .then(() => Object.assign({}, message, { isDispatched: true }))
       .catch((error) => { throw error; });
@@ -258,7 +235,7 @@ function wrap() {
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
     let result = null;
-    //  Send the Sigfox message to the 3 queues.
+    //  Send the Sigfox message to the sigfox.received queue.
     return saveMessage(req, device, type, body, rootTraceId)
       .then((newMessage) => { result = newMessage; return newMessage; })
       //  Wait for the downlink data if any.
