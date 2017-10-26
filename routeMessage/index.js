@@ -51,7 +51,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
       "dependencies": {
         "dnscache": "^1.0.1",
         "dotenv": "^4.0.0",
-        "sigfox-aws": ">=0.0.13",
+        "sigfox-aws": ">=0.0.17",
         "safe-buffer": "5.0.1",
         "node-fetch": "^1.6.3",
         "json-stringify-safe": "^5.0.1",
