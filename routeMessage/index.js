@@ -8,7 +8,7 @@
 //  Debugging: Enable active tracing
 //  Environment Variables:
 //  NODE_ENV=production
-//  SIGFOX_ROUTE=decodeStructuredMessage
+//  SIGFOX_ROUTE=decodeStructuredMessage,sendToUbidots
 
 //  Go to AWS IoT, create a Rule:
 //  Name: sigfoxRouteMessage
