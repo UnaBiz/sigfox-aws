@@ -41,7 +41,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
       "dependencies": {
         "dnscache": "^1.0.1",
         "dotenv": "^4.0.0",
-        "sigfox-aws": ">=0.0.12",
+        "sigfox-aws": ">=0.0.13",
         "safe-buffer": "5.0.1",
         "node-fetch": "^1.6.3",
         "json-stringify-safe": "^5.0.1",
@@ -59,40 +59,14 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  region AWS-Specific Functions
 
 const awsmetadata = { // eslint-disable-next-line no-unused-vars
-  authorize: req => ({}), // eslint-disable-next-line no-unused-vars
-  getProjectMetadata: (req, authClient) => ({ 'sigfox-route': 'decodeStructuredMessage' }),  //  TODO: Get from SigfoxConfig
-  convertMetadata: (req, metadata) => metadata,
+  authorize: req => Promise.resolve({}),
+  //  TODO: Get from SigfoxConfig
+  getProjectMetadata: (/* req, authClient */) => Promise.resolve({ 'sigfox-route': 'decodeStructuredMessage' }),
+  convertMetadata: (req, metadata) => Promise.resolve(metadata),
 };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS Lambda Startup
-
-const mainReq = {};
-const mainRes = {
-  status: (/* code */) => mainRes,  //  TODO
-  json: (/* json */) => mainRes,  //  TODO
-  end: () => mainRes,
-};
-
-function prepareRequest(body) {
-  //  Prepare the request and result objects.
-  mainReq.body = body;
-  /* mainReq.body looks like {
-    device: '1A2345',
-    data: 'b0513801a421f0019405a500',
-    time: '1507112763',
-    duplicate: 'false',
-    snr: '18.86',
-    station: '1D44',
-    avgSnr: '15.54',
-    lat: '1',
-    lng: '104',
-    rssi: '-123.00',
-    seqNumber: '1508',
-    ack: 'false',
-    longPolling: 'false',
-  }; */
-}
 
 // eslint-disable-next-line arrow-body-style
 exports.handler = (event, context, callback) => {
@@ -105,9 +79,7 @@ exports.handler = (event, context, callback) => {
       if (!installed) return null;  //  Dependencies installing now.  Wait until this Lambda reloads.
 
       //  Dependencies loaded, so we can use require here.
-      //  Prepare the request and result objects.
-      //  const body = JSON.parse(event.body);
-      //  prepareRequest(body);
+      //  Call the main function to handle the event.
       //  eslint-disable-next-line no-use-before-define
       return main(event)
         .then(result => callback(null, result))

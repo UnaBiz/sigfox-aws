@@ -22,11 +22,8 @@
 
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.
-//  We insert the Sigfox message into message queues:
-//  (1) sigfox.devices.all (the queue for all devices)
-//  (2) sigfox.devices.<deviceID> (the device specific queue)
-//  (3) sigfox.types.<deviceType> (the specific device type e.g. gps)
-
+//  We insert the Sigfox message into AWS IoT MQTT and AWS SQS message queue sigfox.received.
+//  SQS is only used for debug display.  MQTT queues are used for the actual message routing.
 //  We will return the HTTPS response immediately to Sigfox Cloud while
 //  the processing of the Sigfox continues with other Lambda Functions.
 
