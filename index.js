@@ -132,24 +132,36 @@ function awsGetTopic(req, projectId, topicName) {
     topic: topicName,
     publisher: () => ({
       publish: (buffer) => {
-        //  Publish the message body as an AWS X-Ray annotation.
-        AWSXRay.captureFunc('annotations', (subsegment) => {
-          try {
-            const msg = JSON.parse(buffer.toString());
-            const body = msg.body;
-            if (!body) return;
-            for (const key of Object.keys(body)) {
-              subsegment.addAnnotation(key, body[key]);
+        let subsegment = null;
+        return new Promise((resolve) => {
+          //  Publish the message body as an AWS X-Ray annotation.
+          AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
+            subsegment = subsegment0;
+            try {
+              const msg = JSON.parse(buffer.toString());
+              const body = msg.body;
+              if (!body) {
+                console.log('awsGetTopic', 'no_body');
+                return resolve('no_body');
+              }
+              for (const key of Object.keys(body)) {
+                subsegment.addAnnotation(key, body[key]);
+              }
+            } catch (error) {
+              console.error('awsGetTopic', error.message, error.stack);
             }
-          } catch (error) {
-            console.error('awsGetTopic', error.message, error.stack);
-          }
-        });
-        return Promise.all([
-          awsSendIoTMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
-          awsSendSQSMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
-        ])
-          .catch((error) => { throw error; });
+            return resolve('OK');
+          });
+        })
+          .then(() => Promise.all([
+            awsSendIoTMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
+            awsSendSQSMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
+          ]))
+          .then((res) => {
+            if (subsegment) subsegment.close();
+            return res;
+          })
+          .catch(error => error);
       },
     }),
   };
