@@ -4,7 +4,7 @@
 //  and Ubuntu on Windows for unit testing.
 
 //  region Declarations
-/* eslint-disable max-len,import/newline-after-import,no-nested-ternary */
+/* eslint-disable max-len,import/newline-after-import,no-nested-ternary,prefer-arrow-callback */
 //  This is needed because Node.js doesn't cache DNS lookups and will cause DNS quota to be exceeded.
 require('dnscache')({ enable: true });
 
@@ -28,7 +28,12 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS-Specific Functions
 
-const AWS = require('aws-sdk'); if (!isProduction) AWS.config.loadFromPath('./aws-credentials.json');
+//  Allow AWS X-Ray to capture trace.
+const AWSXRay = require('aws-xray-sdk-core');
+const AWS = isProduction ? AWSXRay.captureAWS(require('aws-sdk')) : require('aws-sdk');
+if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
+else AWS.config.loadFromPath('./aws-credentials.json');
+
 const SQS = new AWS.SQS();
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
@@ -126,11 +131,26 @@ function awsGetTopic(req, projectId, topicName) {
   const topic = {
     topic: topicName,
     publisher: () => ({
-      publish: buffer => Promise.all([
-        awsSendIoTMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
-        awsSendSQSMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
-      ])
-        .catch((error) => { throw error; }),
+      publish: (buffer) => {
+        //  Publish the message body as an AWS X-Ray annotation.
+        AWSXRay.captureFunc('annotations', (subsegment) => {
+          try {
+            const msg = JSON.parse(buffer.toString());
+            const body = msg.body;
+            if (!body) return;
+            for (const key of Object.keys(body)) {
+              subsegment.addAnnotation(key, body[key]);
+            }
+          } catch (error) {
+            console.error('awsGetTopic', error.message, error.stack);
+          }
+        });
+        return Promise.all([
+          awsSendIoTMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
+          awsSendSQSMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
+        ])
+          .catch((error) => { throw error; });
+      },
     }),
   };
   return topic;
@@ -740,6 +760,7 @@ function updateMessageHistory(req, oldMessage) {
   return message;
 }
 
+// eslint-disable-next-line no-unused-vars
 function publishDecodedMessage(req, message0, device, type) {
   //  Save the message to in 3 message queues:
   //  (1) sigfox.devices.all (the queue for all devices)
