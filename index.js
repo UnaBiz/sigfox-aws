@@ -4,7 +4,7 @@
 //  and Ubuntu on Windows for unit testing.
 
 //  region Declarations
-/* eslint-disable max-len,import/newline-after-import,no-nested-ternary,prefer-arrow-callback */
+/* eslint-disable max-len,import/newline-after-import,no-nested-ternary,prefer-arrow-callback,no-use-before-define */
 //  This is needed because Node.js doesn't cache DNS lookups and will cause DNS quota to be exceeded.
 require('dnscache')({ enable: true });
 
@@ -39,7 +39,7 @@ const AWS = isProduction ? AWSXRay.captureAWS(require('aws-sdk')) : require('aws
 if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
 else AWS.config.loadFromPath('./aws-credentials.json');
 
-const SQS = new AWS.SQS();
+// const SQS = new AWS.SQS();
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
@@ -106,7 +106,7 @@ function awsSendIoTMessage(req, topic0, payload) {
     .catch((error) => { module.exports.error(req, 'awsSendIoTMessage', { error, topic, payloadObj, params }); throw error; });
 }
 
-function awsSendSQSMessage(req, topic0, msg) {
+/* function awsSendSQSMessage(req, topic0, msg) {
   //  Send the text message to the AWS Simple Queue Service queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS SQS format like sigfox-devices-all.
@@ -128,7 +128,7 @@ function awsSendSQSMessage(req, topic0, msg) {
   return SQS.sendMessage(params).promise()
     .then(result => module.exports.log(req, 'awsSendSQSMessage', { result, topic, url, msgObj, params }))
     .catch((error) => { module.exports.error(req, 'awsSendSQSMessage', { error, topic, url, msgObj, params }); throw error; });
-}
+} */
 
 function awsGetTopic(req, projectId, topicName) {
   //  Return the AWS IoT MQTT Queue and AWS Simple Queue Service queue with that name
@@ -158,10 +158,8 @@ function awsGetTopic(req, projectId, topicName) {
             return resolve('OK');
           });
         })
-          .then(() => Promise.all([
-            awsSendIoTMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
-            awsSendSQSMessage(req, topicName, buffer.toString()).catch((error) => { throw error; }),
-          ]))
+          .then(() => awsSendIoTMessage(req, topicName, buffer.toString()).catch(dumpError))
+          // TODO: awsSendSQSMessage(req, topicName, buffer.toString()).catch(dumpError),
           .then((res) => {
             if (subsegment) subsegment.close();
             return res;
