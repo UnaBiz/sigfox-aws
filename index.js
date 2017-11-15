@@ -30,6 +30,11 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 
 //  Allow AWS X-Ray to capture trace.
 const AWSXRay = require('aws-xray-sdk-core');
+AWSXRay.middleware.setSamplingRules({
+  rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
+  default: { fixed_target: 1, rate: 0.5 },
+  version: 1,
+});
 const AWS = isProduction ? AWSXRay.captureAWS(require('aws-sdk')) : require('aws-sdk');
 if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
 else AWS.config.loadFromPath('./aws-credentials.json');
