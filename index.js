@@ -834,11 +834,17 @@ function dispatchMessage(req, oldMessage, device) {
   //  const type = msg.route.shift();
   message.type = message.route[0];
   message.route = message.route.slice(1);
-  const type = message.type;
+  let dev = null;
+  let type = message.type;
+  if (type === 'all') {
+    //  Send to sigfox.devices.all when type=all.
+    type = null;
+    dev = 'all';
+  }
   const route = message.route;
   const destination = type;
   const result = message;
-  return publishMessage(req, message, null, type)
+  return publishMessage(req, message, dev, type)
     .then(res => log(req, 'dispatchMessage',
       { result, destination, res, route, message, device, type }))
     .catch(error => log(req, 'dispatchMessage',

@@ -8,7 +8,7 @@
 //  Debugging: Enable active tracing
 //  Environment Variables:
 //  NODE_ENV=production
-//  SIGFOX_ROUTE=decodeStructuredMessage,sendToUbidots
+//  SIGFOX_ROUTE=decodeStructuredMessage,sendToUbidots,sendToDatabase
 
 //  Go to AWS IoT, create a Rule:
 //  Name: sigfoxRouteMessage
@@ -151,6 +151,8 @@ function wrap() {
         //  result looks like 'decodeStructuredMessage,logToGoogleSheets'
         //  Convert to ['decodeStructuredMessage', 'logToGoogleSheets']
         const result = res.split(' ').join('').split(',');  //  Remove spaces.
+        //  Last route is always "all".
+        if (result.indexOf('all') < 0) result.push('all');
         defaultRoute = result;
         defaultRouteExpiry = Date.now() + routeExpiry;
         scloud.log(req, 'getRoute', { result, device: req.device });
