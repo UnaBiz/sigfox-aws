@@ -144,7 +144,7 @@ function awsGetTopic(req, projectId, topicName) {
             subsegment = subsegment0;
             try {
               const msg = JSON.parse(buffer.toString());
-              const body = msg.body;
+              const body = msg.body || msg;
               if (!body) {
                 console.log('awsGetTopic', 'no_body');
                 return resolve('no_body');
@@ -719,11 +719,20 @@ function publishMessage(req, oldMessage, device, type) {
       : { device: oldMessage.device });
   if (device === 'all') message.device = oldMessage.device;
 
+  //  If no more routing, unpack the message for easier rule writing.
+  if (!message.route || message.route.length === 0) {
+    message.options = Object.assign(message.options, { unpackBody: true });
+  }
+
   //  If message contains options.unpackBody=true, then send message.body as the root of the
   //  message.  This is used for sending log messages to BigQuery via Google Cloud DataFlow.
   //  The caller must have called server/bigquery/validateLogSchema.
   if (message.options && message.options.unpackBody) {
+    //  The original content goes into "metadata" field.
+    const metadata = message;
     message = message.body;
+    delete message.body;
+    message.metadata = metadata;
   }
   const pid = credentials.projectId || '';
   const destination = topicName;
