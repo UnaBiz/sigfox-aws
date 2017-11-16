@@ -721,7 +721,7 @@ function publishMessage(req, oldMessage, device, type) {
 
   //  If no more routing, unpack the message for easier rule writing.
   if (!message.route || message.route.length === 0) {
-    message.options = Object.assign(message.options, { unpackBody: true });
+    message.options = Object.assign({}, message.options, { unpackBody: true });
   }
 
   //  If message contains options.unpackBody=true, then send message.body as the root of the
