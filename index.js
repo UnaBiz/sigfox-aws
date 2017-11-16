@@ -731,7 +731,7 @@ function publishMessage(req, oldMessage, device, type) {
     //  The original content goes into "metadata" field.
     const metadata = message;
     message = message.body;
-    delete message.body;
+    delete metadata.body;
     message.metadata = metadata;
   }
   const pid = credentials.projectId || '';
