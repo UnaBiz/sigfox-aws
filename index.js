@@ -725,7 +725,7 @@ function publishMessage(req, oldMessage, device, type) {
   if (device === 'all') message.device = oldMessage.device;
 
   //  If no more routing, unpack the message for easier rule writing.
-  if (!message.route || message.route.length === 0) {
+  if (message.route && message.route.length === 0) {
     message.options = Object.assign({}, message.options, { unpackBody: true });
   }
 
