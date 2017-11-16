@@ -851,9 +851,9 @@ function dispatchMessage(req, oldMessage, device) {
   let dev = null;
   let type = message.type;
   if (type === 'all') {
-    //  Send to sigfox.devices.all when type=all.
+    //  Send to sigfox.devices.deviceid when type=all.
     type = null;
-    dev = 'all';
+    dev = device;
   }
   const route = message.route;
   const destination = type;
