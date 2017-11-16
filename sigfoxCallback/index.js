@@ -54,7 +54,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     "dependencies": {
       "dnscache": "^1.0.1",
       "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.29",
+      "sigfox-aws": ">=0.0.30",
       "safe-buffer": "5.0.1",
       "node-fetch": "^1.6.3",
       "json-stringify-safe": "^5.0.1",
@@ -272,8 +272,11 @@ function wrap() {
     const datetime = new Date(callbackTimestamp)
       .toISOString().replace('T', ' ')
       .substr(0, 19); //  For logging to Google Sheets.
+    const localdatetime = new Date(callbackTimestamp + (8 * 60 * 60 * 1000))
+      .toISOString().replace('T', ' ')
+      .substr(0, 19); //  For convenience in writing AWS IoT Rules.
     //  Save the UUID, datetime and callback timestamp into the message.
-    const body = Object.assign({ uuid: uuid0, datetime, callbackTimestamp },
+    const body = Object.assign({ uuid: uuid0, datetime, localdatetime, callbackTimestamp },
       req.body);
     //  Get the device ID.
     const device = (body.device && typeof body.device === 'string')
