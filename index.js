@@ -29,6 +29,7 @@ const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGT
 //  region AWS-Specific Functions
 
 //  Allow AWS X-Ray to capture trace.
+//  eslint-disable-next-line import/no-unresolved
 const AWSXRay = require('aws-xray-sdk-core');
 AWSXRay.middleware.setSamplingRules({
   rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
@@ -150,7 +151,11 @@ function awsGetTopic(req, projectId, topicName) {
                 return resolve('no_body');
               }
               for (const key of Object.keys(body)) {
-                subsegment.addAnnotation(key, body[key]);
+                //  Log only scalar values.
+                const val = body[key];
+                if (val === null || val === undefined) continue;
+                if (typeof val === 'object') continue;
+                subsegment.addAnnotation(key, val);
               }
             } catch (error) {
               console.error('awsGetTopic', error.message, error.stack);
