@@ -68,7 +68,8 @@ function awsCreateDevice(req, device0) {
   //  Create the AWS Thing with the device name if it doesn't exist.  device is the
   //  Sigfox device ID.
   if (!device0) throw new Error('missing_deviceid');
-  const device = device0.toUpperCase();
+  //  Capitalise device ID but not device names.
+  const device = device0.length > 6 ? device0 : device0.toUpperCase();
   const params = { thingName: device };
   console.log({ describeThing: params });
   //  Lookup the device.
@@ -83,21 +84,23 @@ function awsCreateDevice(req, device0) {
     );
 }
 
-function awsGetDeviceState(req, device0, state) {
+function awsGetDeviceState(req, device0) {
   //  Fetch the AWS IoT Thing state for the device ID.  Returns a promise.
-  //  Result looks like {"state":{"reported":{"deviceLat":1.303224739957452,...
+  //  Result looks like {"reported":{"deviceLat":1.303224739957452,...
   if (!device0) throw new Error('missing_deviceid');
-  const device = device0.toUpperCase();
+  //  Capitalise device ID but not device names.
+  const device = device0.length > 6 ? device0 : device0.toUpperCase();
   const params = { thingName: device };
   console.log({ getThingShadow: params });
   //  Get a connection for AWS IoT Data.
   return awsGetIoTData(req)
     //  Fetch the Thing state.
     .then(IotData => IotData.getThingShadow(params).promise())
-    .then(res => res ? res.payload : res)
-    .then(res => res ? JSON.parse(res) : res)
-    .then(result => module.exports.log(req, 'awsGetDeviceState', { result, device, state, params }))
-    .catch((error) => { module.exports.error(req, 'awsGetDeviceState', { error, device, state, params }); throw error; });
+    //  Return the payload.state.
+    .then(res => (res && res.payload) ? JSON.parse(res.payload) : res)
+    .then(res => (res && res.state) ? res.state : res)
+    .then(result => module.exports.log(req, 'awsGetDeviceState', { result, device, params }))
+    .catch((error) => { module.exports.error(req, 'awsGetDeviceState', { error, device, params }); throw error; });
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -105,7 +108,8 @@ function awsUpdateDeviceState(req, device0, state) {
   //  Update the AWS IoT Thing state for the device ID.  Returns a promise.
   //  Overwrites the existing Thing attributes with the same name.
   if (!device0) throw new Error('missing_deviceid');
-  const device = device0.toUpperCase();
+  //  Capitalise device ID but not device names.
+  const device = device0.length > 6 ? device0 : device0.toUpperCase();
   const payload = {
     state: {
       reported: state,

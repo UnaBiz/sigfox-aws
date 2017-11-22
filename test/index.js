@@ -25,7 +25,9 @@ const testBody = (timestamp, device, data) => ({
   data,
   ctr: 123,
   lig: 456,
-  tmp: 36.9,
+  tmp: parseFloat(
+    (36.0 + (Math.random() * 10.0)
+    ).toFixed(1)),
   longPolling: false,
   device,
   ack: false,
@@ -100,24 +102,62 @@ describe(moduleName, () => {
     return Promise.resolve('OK');
   });
 
-  it('should create device', () => {
+  it('should aggregate values', () => {
+    const device = testDevice1;
+    const msg = getTestMessage('number', device);
+    const scloud = moduleTested;
+
+    const body = Object.assign({}, msg.body);  //  Clone the message body before update.
+    let state = {};
+    let pastValues = [];
+    //  If this Sigfox message has no "tmp" to aggregate, quit.
+    if (body.tmp === null || body.tmp === undefined) return Promise.resolve(msg);
+    //  Create the SigfoxAggregator Thing if not created.
+    return scloud.awsCreateDevice(req, 'SigfoxAggregator')
+      //  Read the last 10 "tmp" values from SigfoxAggregator by device ID.
+      .then(() => scloud.awsGetDeviceState(req, 'SigfoxAggregator')
+        //  In case the device state doesn't exist, return empty state and proceed.
+        .catch(() => {}))
+      //  result contains {"reported":{"1A2345":[1,2,3],...
+      .then((res) => {
+        if (res) state = res.reported;
+        //  pastValues will contain the last 10 values e.g. [1,2,3]
+        if (state && state[device]) pastValues = state[device];
+        //  Append the current value to the last 10 values. Latest value at the end.
+        pastValues.push(body.tmp);
+        //  Remove the oldest value (at the front) if we exceed 10 values.
+        if (pastValues.length > 10) pastValues.shift();
+        //  Set the sum of the 10 values into the Sigfox message as tmpsum.
+        body.tmpsum = pastValues.reduce(  //  Compute the sum of pastValues using reduce function.
+          (sum, val) => (sum + val),  //  For every value found in pastValues, add to sum.
+          0  //  Initial value of the sum is 0.
+        );
+        //  Save the 10 values to SigfoxAggregator.
+        const newState = {};
+        newState[device] = pastValues;
+        console.log('Device', device, 'has accumulated', pastValues, 'with sum', body.tmpsum);
+        return scloud.awsUpdateDeviceState(req, 'SigfoxAggregator', newState);
+      });
+  });
+
+  it.skip('should create device', () => {
     const device = testDevice1;
     return moduleTested.awsCreateDevice(req, device);
   });
 
-  it('should update device state', () => {
+  it.skip('should update device state', () => {
     const device = testDevice1;
     const msg = getTestMessage('number', device);
     const body = msg.body;
     return moduleTested.awsUpdateDeviceState(req, device, body);
   });
 
-  it('should get device state', () => {
+  it.skip('should get device state', () => {
     const device = testDevice1;
     return moduleTested.awsGetDeviceState(req, device);
   });
 
-  it('should publish message and update device state', () => {
+  it.skip('should publish message and update device state', () => {
     const msg = getTestMessage('number', testDevice1);
     return moduleTested.publishMessage(req, msg, testDevice1, null);
   });
