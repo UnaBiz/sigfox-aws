@@ -112,7 +112,7 @@ describe(moduleName, () => {
     return moduleTested.awsUpdateDeviceState(req, device, body);
   });
 
-  it('should publish message', () => {
+  it('should publish message and update device state', () => {
     const msg = getTestMessage('number', testDevice1);
     return moduleTested.publishMessage(req, msg, testDevice1, null);
   });
