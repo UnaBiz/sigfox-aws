@@ -100,20 +100,20 @@ describe(moduleName, () => {
     return Promise.resolve('OK');
   });
 
-  it.skip('should publish message', () => {
-    const msg = getTestMessage('number', testDevice1);
-    return moduleTested.publishMessage(req, msg, 'all', null);
-  });
-
-  it('should create device', () => {
+  it.skip('should create device', () => {
     const device = testDevice1;
     return moduleTested.awsCreateDevice(req, device);
   });
 
-  it('should update device state', () => {
+  it.skip('should update device state', () => {
     const device = testDevice1;
     const msg = getTestMessage('number', device);
     const body = msg.body;
     return moduleTested.awsUpdateDeviceState(req, device, body);
+  });
+
+  it('should publish message', () => {
+    const msg = getTestMessage('number', testDevice1);
+    return moduleTested.publishMessage(req, msg, testDevice1, null);
   });
 });

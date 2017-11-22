@@ -159,6 +159,7 @@ function awsGetTopic(req, projectId, topicName) {
         let subsegment = null;
         return new Promise((resolve) => {
           //  Publish the message body as an AWS X-Ray annotation.
+          //  This allows us to trace the message processing through AWS X-Ray.
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
             try {
@@ -743,8 +744,10 @@ function publishMessage(req, oldMessage, device, type) {
   if (device === 'all') message.device = oldMessage.device;
 
   //  If no more routing, unpack the message for easier rule writing.
+  let endOfRoute = false;
   if (message.route && message.route.length === 0) {
     message.options = Object.assign({}, message.options, { unpackBody: true });
+    endOfRoute = true;
   }
 
   //  If message contains options.unpackBody=true, then send message.body as the root of the
@@ -757,6 +760,7 @@ function publishMessage(req, oldMessage, device, type) {
     delete metadata.body;
     message.metadata = metadata;
   }
+
   const pid = credentials.projectId || '';
   const destination = topicName;
   //  If you get an error here because the queue doesn't exist, it may be OK.
@@ -765,7 +769,16 @@ function publishMessage(req, oldMessage, device, type) {
   return publishJSON(req, topic, message)
     .then((result) => {
       log(req, 'publishMessage', { result, destination, topicName, message, device: oldMessage.device, type, projectId: pid });
-      return result;
+      if (!endOfRoute) return result;
+
+      //  If no more routing, save the unpacked message as AWS Thing State.
+      return awsCreateDevice(req, oldMessage.device)
+        .then(() => awsUpdateDeviceState(req, oldMessage.device, message))
+        .then(() => result)
+        .catch((error) => {
+          log(req, 'publishMessage', { error, destination, topicName, message, device: oldMessage.device, type });
+          return result;  //  Suppress the error.
+        });
     })
     .catch((error) => {
       log(req, 'publishMessage', { error, destination, topicName, message, device: oldMessage.device, type, projectId: pid });
