@@ -88,20 +88,32 @@ describe(moduleName, () => {
     return moduleTested.flushLog(req);
   });
 
-  it('should log', () => {
+  it.skip('should log', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { result: 'OK', number: 789, obj: { level1: { level2: {} } }, msg });
     return Promise.resolve('OK');
   });
 
-  it('should log errors', () => {
+  it.skip('should log errors', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { error: new Error('This is the error message'), number: 789, obj: { level1: { level2: {} } }, msg });
     return Promise.resolve('OK');
   });
 
-  it('should publish message', () => {
+  it.skip('should publish message', () => {
     const msg = getTestMessage('number', testDevice1);
     return moduleTested.publishMessage(req, msg, 'all', null);
+  });
+
+  it('should create device', () => {
+    const device = testDevice1;
+    return moduleTested.awsCreateDevice(req, device);
+  });
+
+  it('should update device state', () => {
+    const device = testDevice1;
+    const msg = getTestMessage('number', device);
+    const body = msg.body;
+    return moduleTested.awsUpdateDeviceState(req, device, body);
   });
 });

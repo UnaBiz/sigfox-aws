@@ -64,12 +64,30 @@ function awsGetIoTData(/* req */) {
   return awsIoTDataPromise;
 }
 
+function awsCreateDevice(req, device0) {
+  //  Create the AWS Thing with the device name if it doesn't exist.  device is the
+  //  Sigfox device ID.
+  if (!device0) throw new Error('missing_deviceid');
+  const device = device0.toUpperCase();
+  const params = { thingName: device };
+  console.log({ describeThing: params });
+  //  Lookup the device.
+  return Iot.describeThing(params).promise()
+    //  Device exists.
+    .then(result => module.exports.log(req, 'awsCreateDevice', { result, device, params }))
+    //  Device is missing. Create it.
+    .catch(() => console.log({ createThing: params }) || Promise.resolve(null)
+      .then(() => Iot.createThing(params).promise())
+      .then(result => module.exports.log(req, 'awsCreateDevice', { result, device, params }))
+      .catch((error) => { module.exports.error(req, 'awsCreateDevice', { error, device, params }); throw error; })
+    );
+}
+
 // eslint-disable-next-line no-unused-vars
-function awsUpdateDeviceState(req, device, state) {
+function awsUpdateDeviceState(req, device0, state) {
   //  Update the device/thing state.  Returns a promise.
-  //  Device must be lower case.
-  //  eslint-disable-next-line no-param-reassign
-  if (device) device = device.toLowerCase();
+  if (!device0) throw new Error('missing_deviceid');
+  const device = device0.toUpperCase();
   const payload = {
     state: {
       reported: state,
@@ -980,6 +998,8 @@ module.exports = {
   getRootSpan,
   endRootSpan,
   createChildSpan,
+  awsCreateDevice,
+  awsUpdateDeviceState,
 };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
