@@ -83,9 +83,27 @@ function awsCreateDevice(req, device0) {
     );
 }
 
+function awsGetDeviceState(req, device0, state) {
+  //  Fetch the AWS IoT Thing state for the device ID.  Returns a promise.
+  //  Result looks like {"state":{"reported":{"deviceLat":1.303224739957452,...
+  if (!device0) throw new Error('missing_deviceid');
+  const device = device0.toUpperCase();
+  const params = { thingName: device };
+  console.log({ getThingShadow: params });
+  //  Get a connection for AWS IoT Data.
+  return awsGetIoTData(req)
+    //  Fetch the Thing state.
+    .then(IotData => IotData.getThingShadow(params).promise())
+    .then(res => res ? res.payload : res)
+    .then(res => res ? JSON.parse(res) : res)
+    .then(result => module.exports.log(req, 'awsGetDeviceState', { result, device, state, params }))
+    .catch((error) => { module.exports.error(req, 'awsGetDeviceState', { error, device, state, params }); throw error; });
+}
+
 // eslint-disable-next-line no-unused-vars
 function awsUpdateDeviceState(req, device0, state) {
-  //  Update the device/thing state.  Returns a promise.
+  //  Update the AWS IoT Thing state for the device ID.  Returns a promise.
+  //  Overwrites the existing Thing attributes with the same name.
   if (!device0) throw new Error('missing_deviceid');
   const device = device0.toUpperCase();
   const payload = {
@@ -93,19 +111,14 @@ function awsUpdateDeviceState(req, device0, state) {
       reported: state,
     },
   };
-  let timestamp = Date.now();
-  //  Timestamp is a string in microseconds.  Convert to local time.
-  if (payload.state.reported.timestamp) {
-    timestamp = parseInt(payload.state.reported.timestamp, 10);
-  }
-  const localtime = timestamp + (8 * 60 * 60 * 1000);  //  SG time is GMT+8 hours.
-  payload.state.reported.timestamp = new Date(localtime).toISOString().replace('Z', '');
   const params = {
     payload: JSON.stringify(payload),
     thingName: device,
   };
   console.log({ updateThingShadow: params });
+  //  Get a connection for AWS IoT Data.
   return awsGetIoTData(req)
+    //  Update the Thing state.
     .then(IotData => IotData.updateThingShadow(params).promise())
     .then(result => module.exports.log(req, 'awsUpdateDeviceState', { result, device, state, payload, params }))
     .catch((error) => { module.exports.error(req, 'awsUpdateDeviceState', { error, device, state, payload, params }); throw error; });
@@ -1007,12 +1020,15 @@ module.exports = {
     ({ credentials: Object.assign({}, credentials), topicName }),
   setRoute: (route) => { module.exports.transformRoute = route; },
 
+  //  AWS utility functions.
+  awsCreateDevice,
+  awsGetDeviceState,
+  awsUpdateDeviceState,
+
   //  For unit test only.
   getRootSpan,
   endRootSpan,
   createChildSpan,
-  awsCreateDevice,
-  awsUpdateDeviceState,
 };
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
