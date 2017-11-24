@@ -4,25 +4,42 @@
 //  and Ubuntu on Windows for unit testing.
 
 //  region Declarations
-/* eslint-disable max-len,import/newline-after-import,no-nested-ternary,prefer-arrow-callback,no-use-before-define */
-//  This is needed because Node.js doesn't cache DNS lookups and will cause DNS quota to be exceeded.
+/* eslint-disable camelcase, no-console, no-nested-ternary, global-require, import/no-unresolved, max-len */
+//  This is needed because Node.js doesn't cache DNS lookups and will cause DNS quota to be exceeded
+//  in Google Cloud.
 require('dnscache')({ enable: true });
 
 //  If the file .env exists in the current folder, use it to populate
-//  the environment variables.
+//  the environment variables e.g. GCLOUD_PROJECT=myproject
 require('dotenv').load();
 
-//  Don't require any other cloud modules in global scope
+//  Don't require any other Google Cloud modules in global scope
 //  because the connections may expire when running for a long time
+//  in Google Cloud Functions.
 
-const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME || 'unknown_function';
+//  Helper constants to detect if we are running on Google Cloud or AWS.
+const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
+const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+const isCloudFunc = isGoogleCloud || isAWS;  //  True if running in Google Cloud or AWS.
 const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
+const functionName = process.env.FUNCTION_NAME || process.env.AWS_LAMBDA_FUNCTION_NAME || 'unknown_function';
+const projectId = isGoogleCloud ? process.env.GCLOUD_PROJECT : null;    //  Google Cloud project ID.
+
 const util = require('util');
+const path = require('path');
 const uuidv4 = require('uuid/v4');
 const stringify = require('json-stringify-safe');
+const tracing = isGoogleCloud ? require('gcloud-trace')() : null;
+const tracingtrace = isGoogleCloud ? require('gcloud-trace/src/trace') : null;
 
-const cloudCredentials = {};
-const logName = process.env.LOGNAME || 'sigfox-aws';  //  Name of the log to write to.
+//  Assume that the Google Service Account credentials are present in this file.
+//  This is needed for calling Google Cloud PubSub, Logging, Trace, Debug APIs
+//  on Linux / MacOS / Ubuntu on Windows.  Assume it's in the main folder for the app.
+const keyFilename = path.join(process.cwd(), 'google-credentials.json');
+//  If we are running in the Google Cloud, no credentials necessary.
+const cloudCredentials = {};  //  AWS
+const googleCredentials = isCloudFunc ? null : { projectId, keyFilename };
+const logName = process.env.LOGNAME || (isGoogleCloud ? 'sigfox-gcloud' : 'sigfox-aws';  //  Name of the log to write to.
 const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGTH, 10) : 40;  //  Width of the left column in logs
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
@@ -249,8 +266,9 @@ function sleep(req, res, millisec) {
 }
 
 function removeNulls(obj, level) {
-  //  Remove null values recursively before logging.
-  //  level should initially be null.
+  //  Remove null values recursively before logging to Google Cloud.
+  //  We don't remove circular references because Google Cloud Logging
+  //  removes circular references.  level should initially be null.
   if (obj === null || obj === undefined || typeof obj === 'function') {
     return null;  //  Parent should discard this item.
   }
@@ -359,9 +377,10 @@ function getRootSpan(req, rootTraceId0) {
         rootSpanPromise: Promise.resolve(null),
       };
     } // eslint-disable-next-line new-cap
-    //  TODO
-    //  const rootTrace = new tracingtrace(tracing, rootTraceId);
-    const rootTrace = awsRootTrace(req);
+    const rootTrace =
+      isGoogleCloud ? new tracingtrace(tracing, rootTraceId) :
+      isAWS ? awsRootTrace(req) :
+      null;
     //  Randomly assign the starting span ID.  Must not clash with previously assigned span ID
     //  for this trace ID.
     //  eslint-disable-next-line no-underscore-dangle
@@ -403,10 +422,10 @@ function createChildSpan(req, name0, labels) {
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Logging Functions: Log to Cloud Logging, Error Reporting and PubSub
+//  region Logging Functions: Log to Google Cloud Logging, Error Reporting and PubSub or AWS CloudWatch
 
-//  Write log records in batches by 5 records normally, max 10 records when flushing.
-const batchSize = flush => (flush ? 5 : 10);
+//  Write log records in batches by 5 records normally, max 10000 records when flushing.
+const batchSize = flush => (flush ? 10000 : 5);
 const logTasks = [];  //  List of logging tasks to be completed.  They return a log entry.
 // eslint-disable-next-line no-unused-vars
 let taskCount = 0;  //  Number of logging tasks completed so far.
@@ -423,12 +442,31 @@ function createTraceID(now0) {
 function publishJSON(req, topic, obj) {
   //  Publish the object as a JSON message to the PubSub topic.
   //  Returns a promise.
-  if (!topic) return Promise.resolve(null);
-  return topic.publisher().publish(new Buffer(stringify(obj)))
-    .catch((error) => { // eslint-disable-next-line no-use-before-define
-      log(req, 'publishJSON', { error, topic, obj });
-      throw error;
-    });
+  try {
+    if (!topic || !obj) return Promise.resolve('missing_topic_obj');
+    // eslint-disable-next-line no-param-reassign
+    if (obj.type === null) delete obj.type;
+    // eslint-disable-next-line no-param-reassign
+    obj = removeNulls(obj, -100); // eslint-disable-next-line no-param-reassign
+    const buf = new Buffer(JSON.stringify(obj));
+    const size = buf.length;
+    // maxMessages - The maximum number of messages to buffer before sending a payload.
+    // maxMilliseconds - The maximum duration to wait before sending a payload.
+    const options = {
+      batching: {
+        maxMessages: 0,
+        maxMilliseconds: 0,
+      },
+    };
+    return topic.publisher(options).publish(buf)
+      .catch((error) => { // eslint-disable-next-line no-use-before-define
+        console.error('publishJSON', error.message, error.stack, topic.name, size, buf.toString());
+        return error;
+      });
+  } catch (error) {
+    console.error('publishJSON', error.message, error.stack);
+    return Promise.resolve('OK');
+  }
 }
 
 function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable global-require, no-param-reassign */
@@ -436,7 +474,7 @@ function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable globa
   //  If specified, logQueueConfig will override the default log queues.
   //  TODO: Reuse the PubSub clients to write batches of records.
   try {
-    if (module.exports.logQueueConfig.length === 0) return Promise.resolve(null);
+    if (module.exports.logQueueConfig.length === 0) return Promise.resolve('nothing');
     const now = Date.now();
     if (!req) req = {};
     if (!para0) para0 = {};
@@ -465,10 +503,12 @@ function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable globa
     const logQueueConfig = logQueueConfig0 || module.exports.logQueueConfig;
     logQueueConfig.forEach((config) => {
       //  Create pubsub client upon use to prevent expired connection.
-      //  TODO
-      //  const credentials = Object.assign({}, googleCredentials, { projectId: config.projectId });
-      //  const topic = require('@google-cloud/pubsub')(credentials).topic(config.topicName);
-      const topic = awsGetTopic(req, config.projectId, config.topicName);
+      const credentials = Object.assign({}, googleCredentials,
+        { projectId: config.projectId });  // eslint-disable-next-line no-use-before-define
+      const topic =
+        isGoogleCloud ? getTopicByCredentials(req, credentials, config.topicName) :
+        isAWS ? awsGetTopic(req, config.projectId, config.topicName) :
+        null;
       promises = promises
         .then(() => publishJSON(req, topic, msg))
         //  Suppress any errors so logging can continue.
@@ -510,9 +550,9 @@ function writeLog(req, loggingLog0, flush) {
     .then((res) => {
       //  Write the non-null records.
       const entries = res.filter(x => (x !== null && x !== undefined));
-      if (entries.length === 0) return null;
-      return loggingLog.write(entries)  //  .catch(dumpError);
-        .catch(error => console.error('writeLog', error.message, error.stack));
+      if (entries.length === 0) return 'nothing';
+      return loggingLog.write(entries)
+        .catch(error => console.error('writeLog', error.message, error.stack, JSON.stringify(entries, null, 2)));
     })
     .then(() => {  //  If flushing, don't wait for the tick.
       if (flush) {
@@ -520,7 +560,7 @@ function writeLog(req, loggingLog0, flush) {
       }
       // eslint-disable-next-line no-use-before-define
       scheduleLog(req, loggingLog);  //  Wait for next tick before writing.
-      return null;
+      return 'OK';
     })
     .catch(dumpError);
 }
@@ -542,8 +582,7 @@ function scheduleLog(req, loggingLog0) {
 
 function flushLog(req) {
   //  We are about to quit.  Write all log items.
-  return writeLog(req, null, true)
-    .catch(dumpError);
+  return writeLog(req, null, true).catch(dumpError);
 }
 
 function getMetadata(para, now, operation) {
@@ -681,11 +720,13 @@ function log(req0, action, para0) {
     if (err) dumpError(err, action, para);
     if (err && isProduction) {
       try {
-        //  Report the error to the Cloud Error Reporting API
-        //  TODO
-        /* const errorReport = require('@google-cloud/error-reporting')({ reportUnhandledRejections: true });
-        errorReport.report(err); */
-        awsReportError(err, action, para);
+        if (isGoogleCloud) {
+          //  Report the error to the Stackdriver Error Reporting API
+          const errorReport = require('@google-cloud/error-reporting')({ reportUnhandledRejections: true });
+          errorReport.report(err);
+        } else if (isAWS) {
+          awsReportError(err, action, para);
+        }
       } catch (err2) { dumpError(err2); }
     }
     const record = { timestamp: `${now}`, action };
@@ -731,7 +772,44 @@ function isProcessedMessage(/* req, message */) {
   return Promise.resolve(false);  //  TODO
 }
 
+function getPubSubByCredentials(req, credentials) {
+  //  Given the Google Credentials, return the cached PubSub connection.  Allows conecting
+  //  to other project IDs.
+  //  eslint-disable-next-line global-require
+  const pubsub = require('@google-cloud/pubsub');
+  return pubsub(credentials);
+  /*
+  const credentialsKey = stringify(credentials);
+  if (!pubsubByCredentials[credentialsKey]) {
+    pubsubByCredentials[credentialsKey] = pubsub(credentials);
+  }
+  return pubsubByCredentials[credentialsKey];
+  */
+}
+
+function getTopicByCredentials(req, credentials, topicName) {
+  //  Given the Google Credentials and topic name, return the cached PubSub topic.  Allows conecting
+  //  to other project IDs and topics.
+  // const credentialsKey = stringify(credentials);
+  // const topicKey = [credentialsKey, topicName].join('|');
+  const pubsubWithCredentials = getPubSubByCredentials(req, credentials);
+  const topic = pubsubWithCredentials.topic(topicName);
+  return topic;
+
+  /*
+  log(req, 'getTopicByCredentials', { credentials, topicName, credentialsKey });
+  if (!topicByCredentials[topicKey]) {
+    const pubsubWithCredentials = getPubSubByCredentials(req, credentials);
+    const topic = pubsubWithCredentials.topic(topicName);
+    topicByCredentials[topicKey] = topic;
+  }
+  log(req, 'getTopicByCredentials', { result: 'OK', credentials, topicName, credentialsKey });
+  return topicByCredentials[topicKey];
+  */
+}
+
 function publishMessage(req, oldMessage, device, type) {
+  //  TODO: Sync sigfox.received with Google Cloud.
   //  Publish the message to the device or message type queue in PubSub.
   //  If device is non-null, publish to sigfox.devices.<<device>>
   //  If type is non-null, publish to sigfox.types.<<type>>
@@ -873,47 +951,6 @@ function publishDecodedMessage(req, message0, device, type) {
     .catch((error) => { throw error; });
 }
 
-function dispatchMessage(req, oldMessage, device) {
-  //  Dispatch the message to the next step in the route of the message.
-  //  message contains { device, type, body, query, route }
-  //  route looks like [ messagetype1, messagetype2, ... ]
-  //  Returns a promise for the updated message.  Caller must have set
-  //  const req = { starttime: Date.now(), event };
-  if (!oldMessage) return Promise.resolve({});
-  //  If already dispatched, return.
-  if (oldMessage.isDispatched) return Promise.resolve(oldMessage);
-  log(req, 'dispatchMessage', { device });
-  //  Update the message history.
-  const message = updateMessageHistory(req, oldMessage);
-  if (!message.route || message.route.length === 0) {
-    //  No more steps to dispatch, publish the decoded message.
-    log(req, 'dispatchMessage', { result: 'no_route', message, device });
-    // TODO: return publishDecodedMessage(req, oldMessage, device, message.type);
-    return Promise.resolve(message);
-  }
-  //  Get the next step and publish the message there.
-  //  Don't use shift() because it mutates the original object:
-  //  const type = msg.route.shift();
-  message.type = message.route[0];
-  message.route = message.route.slice(1);
-  let dev = null;
-  let type = message.type;
-  if (type === 'all') {
-    //  Send to sigfox.devices.deviceid when type=all.
-    type = null;
-    dev = device;
-  }
-  const route = message.route;
-  const destination = type;
-  const result = message;
-  return publishMessage(req, message, dev, type)
-    .then(res => log(req, 'dispatchMessage',
-      { result, destination, res, route, message, device, type }))
-    .catch(error => log(req, 'dispatchMessage',
-      { error, destination, route, message, device, type }))
-    .then(() => result);
-}
-
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Main Function
 
@@ -981,7 +1018,7 @@ function main(event, task) {
         ? log(req, 'skip', { result: message, isProcessed, device, body, event, message })
         //  Else wait for the task to complete then dispatch the next step.
         : runTask(req, event, task, device, body, message)
-        //  Suppress all errors else AWS will retry the message.
+        //  Suppress all errors else Google or AWS will retry the message.
           .catch(dumpError)
     ))
     //  Log the final result i.e. the dispatched message.
@@ -995,8 +1032,10 @@ function main(event, task) {
 //  region Exports
 
 module.exports = {
-  projectId: process.env.GCLOUD_PROJECT,
-  functionName: process.env.FUNCTION_NAME || 'unknown_function',
+  isGoogleCloud,
+  isAWS,
+  projectId,
+  functionName,
   sleep,
   removeNulls,
   dumpError,

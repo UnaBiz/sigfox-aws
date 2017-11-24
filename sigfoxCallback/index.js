@@ -31,11 +31,25 @@
 //  kept as simple as possible to reduce the chance of failure.
 
 /* eslint-disable camelcase, no-console, no-nested-ternary, import/no-dynamic-require, import/newline-after-import, import/no-unresolved, global-require, max-len */
+//  Helper constants to detect if we are running on Google Cloud or AWS.
+const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
+const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+if (isGoogleCloud) require('dnscache')({ enable: true });  //  Enable DNS cache in case we hit the DNS quota for Google Cloud Functions.
 process.on('uncaughtException', err => console.error(err.message, err.stack));  //  Display uncaught exceptions.
 process.on('unhandledRejection', (reason, p) => console.error('Unhandled Rejection at:', p, 'reason:', reason));
+if (isGoogleCloud) {
+  //  Load the Google Cloud Trace and Debug Agents before any require().
+  //  Only works in Cloud Function.
+  require('@google-cloud/trace-agent').start();
+  require('@google-cloud/debug-agent').start();
+}
+
+//  The single wrapper instance for invoking the module functions.
+let wrapper = null;
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
+//  region AWS AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
 
 const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
@@ -69,6 +83,15 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 ; /* eslint-enable quote-props,quotes,comma-dangle,indent */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Google Cloud Startup
+
+if (isGoogleCloud) {
+  //  Create the wrapper and expose the wrapped functions.
+  if (!wrapper) wrapper = wrap();
+  exports = { main: wrapper.main };
+}
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region AWS Lambda Startup
 
 const mainReq = {};
@@ -99,7 +122,7 @@ function prepareRequest(body) {
 }
 
 // eslint-disable-next-line arrow-body-style
-exports.handler = (event, context, callback) => {
+if (isAWS) exports.handler = (event, context, callback) => {
   console.log(JSON.stringify({ event, env: process.env }, null, 2));
   //  We will call "done" to return a JSON response.
   const done = (err, res) => callback(null, {
@@ -117,10 +140,11 @@ exports.handler = (event, context, callback) => {
       if (!installed) return null;  //  Dependencies installing now.  Wait until this Lambda reloads.
 
       //  Dependencies loaded, so we can use require here.
+      if (!wrapper) wrapper = wrap();
       //  Prepare the request and result objects.
       const body = JSON.parse(event.body);
       prepareRequest(body);  //  eslint-disable-next-line no-use-before-define
-      return wrap().main(mainReq, mainRes)
+      return wrapper.main(mainReq, mainRes)
         .then(() => done(null, 'OK'))
         .catch(error => done(error, null));
     })
@@ -133,9 +157,10 @@ exports.handler = (event, context, callback) => {
 function wrap() {
   //  Wrap the module into a function so that all we defer loading of dependencies,
   //  and ensure that cloud resources are properly disposed.
-
-  require('dnscache')({ enable: true });  //  Enable DNS cache in case we hit the DNS quota
-  const scloud = require('sigfox-aws'); //  sigfox-aws Framework
+  const scloud =
+    isGoogleCloud ? require('sigfox-gcloud') :  //  sigfox-gcloud Framework
+    isAWS ? require('sigfox-aws') :  //  sigfox-aws Framework
+    null;
   const uuid = require('uuid');
 
   function getResponse(req, device0, body /* , msg */) {
@@ -165,6 +190,7 @@ function wrap() {
   }
 
   function saveMessage(req, device, type, body, rootTraceId) {
+    //  TODO: Sync with Google Cloud
     //  Save the message to sigfox.received queue.
     scloud.log(req, 'saveMessage', { device, type, body, rootTraceId });
     const query = req.query;
@@ -232,7 +258,7 @@ function wrap() {
     const rootTraceId = msg.rootTraceId;
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
-    if (body.baseStationTime) {
+    if (isAWS && body.baseStationTime) {
       const baseStationTime = parseInt(body.baseStationTime, 10);
       const age = Date.now() - (baseStationTime * 1000);
       console.log({ baseStationTime });
@@ -242,15 +268,21 @@ function wrap() {
       }
     }
     let result = null;
-    //  Send the Sigfox message to the sigfox.received queue.
+    //  Send the Sigfox message to the queues.
     return saveMessage(req, device, type, body, rootTraceId)
       .then((newMessage) => { result = newMessage; return newMessage; })
       //  Wait for the downlink data if any.
       .then(() => getResponse(req, device, body0, msg))
-      //  Return the response to Sigfox Cloud.
-      .then(response => res.status(200).json(response).end())
-      .then(() => result)
-      .catch((error) => { throw error; });
+      .catch(scloud.dumpError)
+      //  Log the final result.
+      .then(() => scloud.log(req, 'result', { result, device, body }))
+      //  Flush the log and wait for it to be completed.
+      //  After this point, don't use common.log since the log has been flushed.
+      .then(() => scloud.endTask(req).catch(scloud.dumpError))
+      //  Return the response to Sigfox Cloud and terminate the Cloud Function.
+      //  Sigfox needs HTTP code 204 to indicate downlink.
+      .then(response => res.status(204).json(response).end())
+      .then(() => result);
   }
 
   function main(req0, res) {
@@ -288,19 +320,15 @@ function wrap() {
     let updatedMessage = oldMessage;
     scloud.log(req, 'start', { device, body, event, rootTraceId });
 
-    //  Now we run the task to publish the message to the 3 queues.
-    //  Wait for the task to complete then dispatch to next step.
-    const runTask = task(req, device, body, oldMessage)
-      .then(result => scloud.log(req, 'result', { result, device, body, event, oldMessage }))
-      .then((result) => { updatedMessage = result; return result; })
-      .catch(error => scloud.log(req, 'error', { error, device, body, event, oldMessage }));
-    const dispatchTask = runTask
-      //  Dispatch will be skipped because isDispatched is set.
-      .then(() => scloud.dispatchMessage(req, updatedMessage, device))
-      .catch(error => scloud.log(req, 'error', { error, device, body, event, updatedMessage }));
-    return dispatchTask
-      //  Flush the log and wait for it to be completed.
-      .then(() => scloud.endTask(req))
+    //  Now we run the task to publish the message to the queues.
+    //  Wait for the publish task to complete.
+    return task(req, device, body, oldMessage)
+      //  At the point, don't use common.log since the log has been flushed.
+      //  The response has been closed so the Cloud Function will terminate soon.
+      //  Don't do any more processing here.
+      .then((result) => { updatedMessage = result; })
+      .catch(scloud.dumpError)
+      //  Return the updated message.
       .then(() => updatedMessage);
   }
 
@@ -338,10 +366,3 @@ function autoInstall(package_json0, event0, context0, callback0) {
 } /* eslint-enable curly, brace-style, import/no-absolute-path */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Expected Output
-
-/*
-*/
-
-//  //////////////////////////////////////////////////////////////////////////////////// endregion
-
