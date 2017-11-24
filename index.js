@@ -740,7 +740,6 @@ function publishMessage(req, oldMessage, device, type) {
   //  message.  This is used for sending log messages to BigQuery via Google Cloud DataFlow.
   //  The caller must have called server/bigquery/validateLogSchema.
   //  Returns a promise for the PubSub publish result.
-  log(req, 'publishMessage', { device: oldMessage.device, type });
   const topicName0 = device
     ? `sigfox.devices.${device}`
     : type
@@ -749,6 +748,7 @@ function publishMessage(req, oldMessage, device, type) {
   const res = module.exports.transformRoute(req, type, device, cloudCredentials, topicName0);
   const credentials = res.credentials;
   const topicName = res.topicName;
+  log(req, 'publishMessage', { device: oldMessage.device, type, topicName });
   //  Create pubsub client here to prevent expired connection.
   //  eslint-disable-next-line global-require
   //  const topic = require('@google-cloud/pubsub')(credentials).topic(topicName);
