@@ -71,7 +71,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
   {
     "name": "sigfoxCallback",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "author": {
       "name": "Lee Lup Yuen",
       "email": "ly.lee@unabiz.com",
@@ -83,7 +83,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     },
     "dependencies": {
       "dnscache": "^1.0.1",
-      "sigfox-aws": ">=2.0.0",
+      "sigfox-aws": ">=1.0.0",
       "uuid": "^3.1.0"
     }
   }
