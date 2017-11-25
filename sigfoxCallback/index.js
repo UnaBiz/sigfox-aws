@@ -27,7 +27,7 @@
 //  Use this test event for testing.  The "time" field should be set to number of seconds
 //  since 1970 Jan 1 UTC (e.g. 1511614827).  Use Chrome console to compute: Date.now() / 1000
 const testEvent = `{
-  "body": "{\\"device\\":\\"1A2345\\",\\"data\\":\\"b0513801a421f0019405a500\\",\\"time\\":\\"1511714827\\",\\"duplicate\\":\\"false\\",\\"snr\\":\\"18.86\\",\\"station\\":\\"1D44\\",\\"avgSnr\\":\\"15.54\\",\\"lat\\":\\"1\\",\\"lng\\":\\"104\\",\\"rssi\\":\\"-123.00\\",\\"seqNumber\\":\\"1508\\",\\"ack\\":\\"false\\",\\"longPolling\\":\\"false\\"}",
+  "body": "{\\"device\\":\\"1A2345\\",\\"data\\":\\"b0513801a421f0019405a500\\",\\"time\\":\\"1511814827\\",\\"duplicate\\":\\"false\\",\\"snr\\":\\"18.86\\",\\"station\\":\\"1D44\\",\\"avgSnr\\":\\"15.54\\",\\"lat\\":\\"1\\",\\"lng\\":\\"104\\",\\"rssi\\":\\"-123.00\\",\\"seqNumber\\":\\"1508\\",\\"ack\\":\\"false\\",\\"longPolling\\":\\"false\\"}",
   "resource": "/{proxy+}",
   "requestContext": {
     "resourceId": "123456",
@@ -127,7 +127,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     },
     "dependencies": {
       "dnscache": "^1.0.1",
-      "sigfox-aws": ">=1.0.2",
+      "sigfox-aws": ">=1.0.3",
       "uuid": "^3.1.0"
     }
   }
