@@ -2,6 +2,7 @@
 //  Copy and paste the entire contents of this file into a Lambda Function
 //  Name: sigfoxCallback
 //  Runtime: Node.js 6.10
+//  Handler: index.main
 //  Memory: 512 MB
 //  Timeout: 1 min
 //  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
