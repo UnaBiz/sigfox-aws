@@ -59,3 +59,8 @@ function install(package_json, event, context, callback, sourceCode) {
 module.exports = {
     install,
 };
+
+/*
+ if (!wrapper.main) wrapper = wrap(package_json);  //  Already installed or in unit test.
+    return wrapper.main.bind(wrapper)(event0, context0, callback0); }  //  Run
+*/
