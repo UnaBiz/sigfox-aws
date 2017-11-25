@@ -277,13 +277,17 @@ function wrap(/* package_json */) {
     const rootTraceId = msg.rootTraceId;
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
+    //  Only for AWS: Check whether message is too old.
     if (isAWS && body.baseStationTime) {
       const baseStationTime = parseInt(body.baseStationTime, 10);
       const age = Date.now() - (baseStationTime * 1000);
-      console.log({ baseStationTime });
       if (age > 5 * 60 * 1000) {
-        //  If older than 5 mins, reject.
-        throw new Error(`too_old: ${age}`);
+        //  If older than 5 mins, reject. This helps to flush the queue of pending requests.
+        const error = new Error(`Rejecting old message: ${age} seconds diff`);
+        const seqNumber = body.seqNumber;
+        const localdatetime = body.localdatetime;
+        scloud.error(req, 'task', { error, device, seqNumber, localdatetime, baseStationTime });
+        return Promise.resolve(msg);
       }
     }
     let result = null;
