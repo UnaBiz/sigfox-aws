@@ -1,6 +1,7 @@
 //  Unit Test
 /* global describe:true, it:true, beforeEach:true, afterEach:true */
 /* eslint-disable max-len, import/no-extraneous-dependencies, no-console, no-unused-vars, one-var, no-underscore-dangle */
+process.env.AWS_LAMBDA_FUNCTION_NAME = 'unittest';
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
 const uuidv4 = require('uuid/v4');

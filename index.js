@@ -4,237 +4,23 @@
 //  and Ubuntu on Windows for unit testing.
 
 //  region Declarations
-/* eslint-disable max-len,import/newline-after-import,no-nested-ternary,prefer-arrow-callback,no-use-before-define */
-//  This is needed because Node.js doesn't cache DNS lookups and will cause DNS quota to be exceeded.
-require('dnscache')({ enable: true });
-
-//  If the file .env exists in the current folder, use it to populate
-//  the environment variables.
-require('dotenv').load();
-
-//  Don't require any other cloud modules in global scope
-//  because the connections may expire when running for a long time
-
-const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME || 'unknown_function';
+/* eslint-disable camelcase, no-console, no-nested-ternary, global-require, import/no-unresolved, max-len */
+//  Helper constants to detect if we are running on Google Cloud or AWS.
+const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
+const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
+
+const cloud = //  Load Google Cloud and AWS-specific functions. Must be loaded before other libraries.
+  isGoogleCloud ? require('./lib/gcloud') :
+  isAWS ? require('./lib/aws') :
+  (() => { throw new Error('Cloud configuration missing'); })();
+
+//  Next load the other libraries.
 const util = require('util');
 const uuidv4 = require('uuid/v4');
 const stringify = require('json-stringify-safe');
 
-const cloudCredentials = {};
-const logName = process.env.LOGNAME || 'sigfox-aws';  //  Name of the log to write to.
 const logKeyLength = process.env.LOGKEYLENGTH ? parseInt(process.env.LOGKEYLENGTH, 10) : 40;  //  Width of the left column in logs
-
-//  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region AWS-Specific Functions
-
-//  Allow AWS X-Ray to capture trace.
-//  eslint-disable-next-line import/no-unresolved
-const AWSXRay = require('aws-xray-sdk-core');
-AWSXRay.middleware.setSamplingRules({
-  rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
-  default: { fixed_target: 1, rate: 0.5 },
-  version: 1,
-});
-const AWS = isProduction ? AWSXRay.captureAWS(require('aws-sdk')) : require('aws-sdk');
-if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
-else AWS.config.loadFromPath('./aws-credentials.json');
-
-// const SQS = new AWS.SQS();
-const Iot = new AWS.Iot();
-let awsIoTDataPromise = null;
-
-function awsReportError(/* err, action, para */) {
-  //  TODO
-}
-
-function awsGetIoTData(/* req */) {
-  //  Return a promise for the IotData object for updating message queue
-  //  and device state.
-  if (awsIoTDataPromise) return awsIoTDataPromise;
-  awsIoTDataPromise = Iot.describeEndpoint({}).promise()
-    .then((res) => {
-      const IotData = new AWS.IotData({ endpoint: res.endpointAddress });
-      return IotData;
-    })
-    .catch((error) => {
-      awsIoTDataPromise = null;
-      throw error;
-    });
-  return awsIoTDataPromise;
-}
-
-function awsCreateDevice(req, device0) {
-  //  Create the AWS Thing with the device name if it doesn't exist.  device is the
-  //  Sigfox device ID.
-  if (!device0) throw new Error('missing_deviceid');
-  //  Capitalise device ID but not device names.
-  const device = device0.length > 6 ? device0 : device0.toUpperCase();
-  const params = { thingName: device };
-  console.log({ describeThing: params });
-  //  Lookup the device.
-  return Iot.describeThing(params).promise()
-    //  Device exists.
-    .then(result => module.exports.log(req, 'awsCreateDevice', { result, device, params }))
-    //  Device is missing. Create it.
-    .catch(() => console.log({ createThing: params }) || Promise.resolve(null)
-      .then(() => Iot.createThing(params).promise())
-      .then(result => module.exports.log(req, 'awsCreateDevice', { result, device, params }))
-      .catch((error) => { module.exports.error(req, 'awsCreateDevice', { error, device, params }); throw error; })
-    );
-}
-
-function awsGetDeviceState(req, device0) {
-  //  Fetch the AWS IoT Thing state for the device ID.  Returns a promise.
-  //  Result looks like {"reported":{"deviceLat":1.303224739957452,...
-  if (!device0) throw new Error('missing_deviceid');
-  //  Capitalise device ID but not device names.
-  const device = device0.length > 6 ? device0 : device0.toUpperCase();
-  const params = { thingName: device };
-  console.log({ getThingShadow: params });
-  //  Get a connection for AWS IoT Data.
-  return awsGetIoTData(req)
-    //  Fetch the Thing state.
-    .then(IotData => IotData.getThingShadow(params).promise())
-    //  Return the payload.state.
-    .then(res => (res && res.payload) ? JSON.parse(res.payload) : res)
-    .then(res => (res && res.state) ? res.state : res)
-    .then(result => module.exports.log(req, 'awsGetDeviceState', { result, device, params }))
-    .catch((error) => { module.exports.error(req, 'awsGetDeviceState', { error, device, params }); throw error; });
-}
-
-// eslint-disable-next-line no-unused-vars
-function awsUpdateDeviceState(req, device0, state) {
-  //  Update the AWS IoT Thing state for the device ID.  Returns a promise.
-  //  Overwrites the existing Thing attributes with the same name.
-  if (!device0) throw new Error('missing_deviceid');
-  //  Capitalise device ID but not device names.
-  const device = device0.length > 6 ? device0 : device0.toUpperCase();
-  const payload = {
-    state: {
-      reported: state,
-    },
-  };
-  const params = {
-    payload: JSON.stringify(payload),
-    thingName: device,
-  };
-  console.log({ updateThingShadow: params });
-  //  Get a connection for AWS IoT Data.
-  return awsGetIoTData(req)
-    //  Update the Thing state.
-    .then(IotData => IotData.updateThingShadow(params).promise())
-    .then(result => module.exports.log(req, 'awsUpdateDeviceState', { result, device, state, payload, params }))
-    .catch((error) => { module.exports.error(req, 'awsUpdateDeviceState', { error, device, state, payload, params }); throw error; });
-}
-
-function awsSendIoTMessage(req, topic0, payload) {
-  //  Send the text message to the AWS IoT MQTT queue name.
-  //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
-  //  to AWS MQTT format like sigfox/devices/all.
-  const payloadObj = JSON.parse(payload);
-  const topic = (topic0 || '').split('.').join('/');
-  const params = { topic, payload, qos: 0 };
-  module.exports.log(req, 'awsSendIoTMessage', { topic, payloadObj, params });
-  return awsGetIoTData(req)
-    .then(IotData => IotData.publish(params).promise())
-    .then(result => module.exports.log(req, 'awsSendIoTMessage', { result, topic, payloadObj, params }))
-    .catch((error) => { module.exports.error(req, 'awsSendIoTMessage', { error, topic, payloadObj, params }); throw error; });
-}
-
-/* function awsSendSQSMessage(req, topic0, msg) {
-  //  Send the text message to the AWS Simple Queue Service queue name.
-  //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
-  //  to AWS SQS format like sigfox-devices-all.
-  const msgObj = JSON.parse(msg);
-  const topic = (topic0 || '').split('.').join('-');
-  const url = `${SQS.endpoint.href}${topic}`;
-  const params = {
-    MessageBody: msg,
-    QueueUrl: url,
-    DelaySeconds: 0,
-    MessageAttributes: {
-      device: {
-        DataType: 'String',
-        StringValue: msgObj.device || 'missing_device',
-      },
-    },
-  };
-  module.exports.log(req, 'awsSendSQSMessage', { topic, url, msgObj, params });
-  return SQS.sendMessage(params).promise()
-    .then(result => module.exports.log(req, 'awsSendSQSMessage', { result, topic, url, msgObj, params }))
-    .catch((error) => { module.exports.error(req, 'awsSendSQSMessage', { error, topic, url, msgObj, params }); throw error; });
-} */
-
-function awsGetTopic(req, projectId, topicName) {
-  //  Return the AWS IoT MQTT Queue and AWS Simple Queue Service queue with that name
-  //  for that project.  Will be used for publishing messages, not reading.
-  const topic = {
-    topic: topicName,
-    publisher: () => ({
-      publish: (buffer) => {
-        let subsegment = null;
-        return new Promise((resolve) => {
-          //  Publish the message body as an AWS X-Ray annotation.
-          //  This allows us to trace the message processing through AWS X-Ray.
-          AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
-            subsegment = subsegment0;
-            try {
-              const msg = JSON.parse(buffer.toString());
-              const body = msg.body || msg;
-              if (!body) {
-                console.log('awsGetTopic', 'no_body');
-                return resolve('no_body');
-              }
-              for (const key of Object.keys(body)) {
-                //  Log only scalar values.
-                const val = body[key];
-                if (val === null || val === undefined) continue;
-                if (typeof val === 'object') continue;
-                subsegment.addAnnotation(key, val);
-              }
-            } catch (error) {
-              console.error('awsGetTopic', error.message, error.stack);
-            }
-            return resolve('OK');
-          });
-        })
-          .then(() => awsSendIoTMessage(req, topicName, buffer.toString()).catch(dumpError))
-          // TODO: awsSendSQSMessage(req, topicName, buffer.toString()).catch(dumpError),
-          .then((res) => {
-            if (subsegment) subsegment.close();
-            return res;
-          })
-          .catch(error => error);
-      },
-    }),
-  };
-  return topic;
-}
-
-//  TODO
-const loggingLog = {
-  write: (entry) => { console.log(stringify(entry ? entry.event || '' : '', null, 2)); return Promise.resolve({}); },
-  entry: (metadata, event) => ({ metadata, event }),
-};
-
-//  TODO
-const rootSpanStub = {
-  startSpan: (/* rootSpanName, labels */) => ({
-    end: () => ({}),
-  }),
-  end: () => ({}),
-};
-const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-  startSpan: (/* rootSpanName, labels */) => rootSpanStub,
-  end: () => ({}),
-};
-const tracing = { startTrace: () => rootTraceStub };
-
-function awsRootTrace(/* req */) {
-  //  Return the root trace for instrumentation.
-  return rootTraceStub;
-}
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Utility Functions
@@ -249,8 +35,9 @@ function sleep(req, res, millisec) {
 }
 
 function removeNulls(obj, level) {
-  //  Remove null values recursively before logging.
-  //  level should initially be null.
+  //  Remove null values recursively before logging to Google Cloud.
+  //  We don't remove circular references because Google Cloud Logging
+  //  removes circular references.  level should initially be null.
   if (obj === null || obj === undefined || typeof obj === 'function') {
     return null;  //  Parent should discard this item.
   }
@@ -303,7 +90,7 @@ function dumpNullError(error, action, para) {
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Instrumentation Functions: Trace the execution of this Sigfox Callback across multiple Cloud Functions
+//  region Instrumentation Functions: Trace the execution of this Sigfox Callback across multiple Cloud Functions via Google Cloud Tracing or AWS X-Ray
 
 function getSpanName(req) {
   //  Return a span name based on the device ID, sequence number and basestationTime:
@@ -330,7 +117,7 @@ function startRootSpan(req, rootTrace0) {
   //  https://github.com/zbjornson/gcloud-trace/blob/master/src/index.js
   //  Create the root trace.
   const labels = {};
-  const rootTrace = rootTrace0 || tracing.startTrace();
+  const rootTrace = rootTrace0 || cloud.startTrace(req);
   //  Start the span.
   const rootSpanName = getSpanName(req);
   const rootSpan = rootTrace.startSpan(rootSpanName, labels);
@@ -358,10 +145,8 @@ function getRootSpan(req, rootTraceId0) {
         rootTracePromise: Promise.resolve(null),
         rootSpanPromise: Promise.resolve(null),
       };
-    } // eslint-disable-next-line new-cap
-    //  TODO
-    //  const rootTrace = new tracingtrace(tracing, rootTraceId);
-    const rootTrace = awsRootTrace(req);
+    }
+    const rootTrace = cloud.createRootTrace(req, rootTraceId);
     //  Randomly assign the starting span ID.  Must not clash with previously assigned span ID
     //  for this trace ID.
     //  eslint-disable-next-line no-underscore-dangle
@@ -391,7 +176,7 @@ function endRootSpan(req) {
 function createChildSpan(req, name0, labels) {
   //  Create a child span to trace a task in this module.  Returns a promise.
   const name = [
-    functionName,
+    cloud.functionName,
     (name0 || 'missing_name').split('/').join(' / '),
   ].join(' / ');
   return getRootSpan(req).rootSpanPromise
@@ -403,10 +188,10 @@ function createChildSpan(req, name0, labels) {
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Logging Functions: Log to Cloud Logging, Error Reporting and PubSub
+//  region Logging Functions: Log to Google Cloud Logging, Error Reporting and PubSub or AWS CloudWatch
 
-//  Write log records in batches by 5 records normally, max 10 records when flushing.
-const batchSize = flush => (flush ? 5 : 10);
+//  Write log records in batches by 5 records normally, max 10000 records when flushing.
+const batchSize = flush => (flush ? 10000 : 5);
 const logTasks = [];  //  List of logging tasks to be completed.  They return a log entry.
 // eslint-disable-next-line no-unused-vars
 let taskCount = 0;  //  Number of logging tasks completed so far.
@@ -423,12 +208,23 @@ function createTraceID(now0) {
 function publishJSON(req, topic, obj) {
   //  Publish the object as a JSON message to the PubSub topic.
   //  Returns a promise.
-  if (!topic) return Promise.resolve(null);
-  return topic.publisher().publish(new Buffer(stringify(obj)))
-    .catch((error) => { // eslint-disable-next-line no-use-before-define
-      log(req, 'publishJSON', { error, topic, obj });
-      throw error;
-    });
+  try {
+    if (!topic || !obj) return Promise.resolve('missing_topic_obj');
+    // eslint-disable-next-line no-param-reassign
+    if (obj.type === null) delete obj.type;
+    // eslint-disable-next-line no-param-reassign
+    obj = removeNulls(obj); // eslint-disable-next-line no-param-reassign
+    const buf = new Buffer(stringify(obj));
+    const size = buf.length;
+    return topic.publisher().publish(buf)
+      .catch((error) => { // eslint-disable-next-line no-use-before-define
+        console.error('publishJSON', error.message, error.stack, topic.name, size, buf.toString());
+        return error;
+      });
+  } catch (error) {
+    console.error('publishJSON', error.message, error.stack);
+    return Promise.resolve('OK');
+  }
 }
 
 function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable global-require, no-param-reassign */
@@ -436,7 +232,7 @@ function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable globa
   //  If specified, logQueueConfig will override the default log queues.
   //  TODO: Reuse the PubSub clients to write batches of records.
   try {
-    if (module.exports.logQueueConfig.length === 0) return Promise.resolve(null);
+    if (module.exports.logQueueConfig.length === 0) return Promise.resolve('nothing');
     const now = Date.now();
     if (!req) req = {};
     if (!para0) para0 = {};
@@ -464,11 +260,7 @@ function logQueue(req, action, para0, logQueueConfig0) { /* eslint-disable globa
     const result = [];
     const logQueueConfig = logQueueConfig0 || module.exports.logQueueConfig;
     logQueueConfig.forEach((config) => {
-      //  Create pubsub client upon use to prevent expired connection.
-      //  TODO
-      //  const credentials = Object.assign({}, googleCredentials, { projectId: config.projectId });
-      //  const topic = require('@google-cloud/pubsub')(credentials).topic(config.topicName);
-      const topic = awsGetTopic(req, config.projectId, config.topicName);
+      const topic = cloud.getQueue(req, config.projectId, config.topicName);
       promises = promises
         .then(() => publishJSON(req, topic, msg))
         //  Suppress any errors so logging can continue.
@@ -501,7 +293,7 @@ function writeLog(req, loggingLog0, flush) {
     const task = logTasks.shift();
     if (!task) break;
     //  Add the task to the batch.
-    batch.push(task(loggingLog).catch(dumpNullError));
+    batch.push(task(cloud.loggingLog).catch(dumpNullError));
     taskCount += 1;
   }
   // console.log(`______ ${taskCount} / ${batch.length} / ${logTasks.length}`);
@@ -510,17 +302,17 @@ function writeLog(req, loggingLog0, flush) {
     .then((res) => {
       //  Write the non-null records.
       const entries = res.filter(x => (x !== null && x !== undefined));
-      if (entries.length === 0) return null;
-      return loggingLog.write(entries)  //  .catch(dumpError);
-        .catch(error => console.error('writeLog', error.message, error.stack));
+      if (entries.length === 0) return 'nothing';
+      return cloud.loggingLog.write(entries)
+        .catch(error => console.error('writeLog', error.message, error.stack, JSON.stringify(entries, null, 2)));
     })
     .then(() => {  //  If flushing, don't wait for the tick.
       if (flush) {
-        return writeLog(req, loggingLog, flush).catch(dumpError);
+        return writeLog(req, cloud.loggingLog, flush).catch(dumpError);
       }
       // eslint-disable-next-line no-use-before-define
-      scheduleLog(req, loggingLog);  //  Wait for next tick before writing.
-      return null;
+      scheduleLog(req, cloud.loggingLog);  //  Wait for next tick before writing.
+      return 'OK';
     })
     .catch(dumpError);
 }
@@ -534,7 +326,7 @@ function scheduleLog(req, loggingLog0) {
   //  const loggingLog = loggingLog0;
   process.nextTick(() => {
     try {
-      writeLog(req, loggingLog)
+      writeLog(req, cloud.loggingLog)
         .catch(dumpError);
     } catch (err) { dumpError(err); }
   });
@@ -543,7 +335,8 @@ function scheduleLog(req, loggingLog0) {
 function flushLog(req) {
   //  We are about to quit.  Write all log items.
   return writeLog(req, null, true)
-    .catch(dumpError);
+    .catch(dumpError)
+    .then(() => console.log('flushLog'));
 }
 
 function getMetadata(para, now, operation) {
@@ -559,7 +352,7 @@ function getMetadata(para, now, operation) {
         version_id: process.env.GAE_VERSION,
       } }
     //  For Google Cloud Functions.
-    : { type: 'cloud_function', labels: { function_name: functionName } };
+    : { type: 'cloud_function', labels: { function_name: cloud.functionName } };
   const metadata = {
     timestamp,
     severity: level.toUpperCase(),
@@ -593,14 +386,14 @@ function deferLog(req, action, para0, record, now, operation, loggingLog0) { /* 
             json = stringify(val);
             record[key] = JSON.parse(json);
           } catch (err) {  /* eslint-disable no-console */
-            console.error({ deferLog: err.message, json });
+            console.error('deferLog', err.message, err.stack, json);
           } /* eslint-enable no-console */
         }
         //  Log the user properties.
         if (req.user) {
           record.user = { email: req.user.email || req.user.emails || req.user };
         }
-        record.source = process.env.GAE_SERVICE || process.env.FUNCTION_NAME || logName;
+        record.source = cloud.sourceName;
         if (!isProduction || process.env.CIRCLECI) {  //  Log to console in dev.
           const out = [action, util.inspect(record, { colors: true })].join(' | ');
           if (para.err) console.error(out);
@@ -616,6 +409,7 @@ function deferLog(req, action, para0, record, now, operation, loggingLog0) { /* 
         const event = {};
         event[key] = para;
         const metadata = getMetadata(para, now, operation);
+        // console.log('deferLog2', key, JSON.stringify(event, null, 2), JSON.stringify(metadata, null, 2)); ////
         return loggingLog0.entry(metadata, event);
       })
       .catch(dumpNullError);
@@ -681,11 +475,7 @@ function log(req0, action, para0) {
     if (err) dumpError(err, action, para);
     if (err && isProduction) {
       try {
-        //  Report the error to the Cloud Error Reporting API
-        //  TODO
-        /* const errorReport = require('@google-cloud/error-reporting')({ reportUnhandledRejections: true });
-        errorReport.report(err); */
-        awsReportError(err, action, para);
+        cloud.reportError(req, err, action, para);
       } catch (err2) { dumpError(err2); }
     }
     const record = { timestamp: `${now}`, action };
@@ -703,8 +493,8 @@ function log(req0, action, para0) {
     //  Create the log operation.
     const operation = getOperation(req, action, para);
     if (process.env.LOG_FOREGROUND) {  //  For debugging, log in foreground.
-      deferLog(req, action, para, record, now, operation, loggingLog)
-        .then(entry => loggingLog.write(entry))  // .catch(dumpError);
+      deferLog(req, action, para, record, now, operation, cloud.loggingLog)
+        .then(entry => cloud.loggingLog.write(entry))  // .catch(dumpError);
         .catch(error => console.error('log', error.message, error.stack));
       return err || para.result || null;
     }
@@ -722,7 +512,7 @@ function log(req0, action, para0) {
 } /* eslint-enable no-param-reassign, global-require */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Messaging Functions: Dispatch messages between Cloud Functions via PubSub
+//  region Messaging Functions: Dispatch messages between Cloud Functions via Google Cloud PubSub or AWS IoT MQTT Queues
 
 function isProcessedMessage(/* req, message */) {
   //  Return true if this message is being or has been processed recently by this server
@@ -745,15 +535,13 @@ function publishMessage(req, oldMessage, device, type) {
     : type
       ? `sigfox.types.${type}`
       : 'sigfox.received';
-  const res = module.exports.transformRoute(req, type, device, cloudCredentials, topicName0);
+  const res = module.exports.transformRoute(req, type, device, cloud.credentials, topicName0);
   const credentials = res.credentials;
+  const projectId = (credentials && credentials.projectId)
+    ? credentials.projectId : null;
   const topicName = res.topicName;
-  log(req, 'publishMessage', { device: oldMessage.device, type, topicName });
-  //  Create pubsub client here to prevent expired connection.
-  //  eslint-disable-next-line global-require
-  //  const topic = require('@google-cloud/pubsub')(credentials).topic(topicName);
-  const topic = awsGetTopic(req, null, topicName);
-
+  const topic = cloud.getQueue(req, projectId, topicName);
+  log(req, 'publishMessage', { device: oldMessage.device, type, topic: topic ? topic.name : null });
   let message = Object.assign({}, oldMessage,
     device ? { device: (device === 'all') ? oldMessage.device : device }
       : type ? { type }
@@ -762,9 +550,12 @@ function publishMessage(req, oldMessage, device, type) {
 
   //  If no more routing, unpack the message for easier rule writing.
   let endOfRoute = false;
-  if (message.route && message.route.length === 0) {
-    message.options = Object.assign({}, message.options, { unpackBody: true });
-    endOfRoute = true;
+  if (isAWS) {
+    //  TODO: AWS now unpacks the message at end of route.  To harmonise with Google Cloud.
+    if (message.route && message.route.length === 0) {
+      message.options = Object.assign({}, message.options, { unpackBody: true });
+      endOfRoute = true;
+    }
   }
 
   //  If message contains options.unpackBody=true, then send message.body as the root of the
@@ -777,7 +568,6 @@ function publishMessage(req, oldMessage, device, type) {
     delete metadata.body;
     message.metadata = metadata;
   }
-
   const pid = credentials.projectId || '';
   const destination = topicName;
   //  If you get an error here because the queue doesn't exist, it may be OK.
@@ -789,8 +579,8 @@ function publishMessage(req, oldMessage, device, type) {
       if (!endOfRoute) return result;
 
       //  If no more routing, save the unpacked message as AWS Thing State.
-      return awsCreateDevice(req, oldMessage.device)
-        .then(() => awsUpdateDeviceState(req, oldMessage.device, message))
+      return cloud.createDevice(req, oldMessage.device)
+        .then(() => cloud.updateDeviceState(req, oldMessage.device, message))
         .then(() => result)
         .catch((error) => {
           log(req, 'publishMessage', { error, destination, topicName, message, device: oldMessage.device, type });
@@ -831,46 +621,10 @@ function updateMessageHistory(req, oldMessage) {
     duration,
     latency,
     source,
-    function: functionName,
+    function: cloud.functionName,
   };
   message.history.push(rec);
   return message;
-}
-
-// eslint-disable-next-line no-unused-vars
-function publishDecodedMessage(req, message0, device, type) {
-  //  Save the message to in 3 message queues:
-  //  (1) sigfox.devices.all (the queue for all devices)
-  //  (2) sigfox.devices.<deviceID> (the device specific queue)
-  //  (3) sigfox.types.<deviceType> (the specific device type e.g. gps)
-  //  There may be another Cloud Function waiting on sigfox.devices.all
-  //  to process this message e.g. routeMessage.
-  //  Where does type come from?  It's specified in the callback URL
-  //  e.g. https://myproject.appspot.com?type=gps
-  log(req, 'publishDecodedMessage', { device, type });
-  const queues = [
-    { device },  //  sigfox.devices.<deviceID> (the device specific queue)
-    { device: 'all' },  //  sigfox.devices.all (the queue for all devices)
-  ];
-  if (type) queues.push({ type });  //  sigfox.types.<deviceType>
-  const message = updateMessageHistory(req, message0, device);
-  //  Get a list of promises, one for each publish operation to each queue.
-  const promises = [];
-  for (const queue of queues) {
-    //  Send message to each queue, either the device ID or message type queue.
-    const promise = publishMessage(req, message, queue.device, queue.type)
-      .catch((error) => {
-        log(req, 'publishDecodedMessage', { error, device, type });
-        return error;  //  Suppress the error so other sends can proceed.
-      });
-    promises.push(promise);
-  }
-  //  Wait for the messages to be published to the queues.
-  return Promise.all(promises)
-    //  Return the message with dispatch flag set so we don't resend.
-    .then(() => log(req, 'publishDecodedMessage', { result: message, device, type }))
-    .then(() => Object.assign({}, message, { isDispatched: true }))
-    .catch((error) => { throw error; });
 }
 
 function dispatchMessage(req, oldMessage, device) {
@@ -886,10 +640,10 @@ function dispatchMessage(req, oldMessage, device) {
   //  Update the message history.
   const message = updateMessageHistory(req, oldMessage);
   if (!message.route || message.route.length === 0) {
-    //  No more steps to dispatch, publish the decoded message.
-    log(req, 'dispatchMessage', { result: 'no_route', message, device });
-    // TODO: return publishDecodedMessage(req, oldMessage, device, message.type);
-    return Promise.resolve(message);
+    //  No more steps to dispatch, so exit.
+    const result = message;
+    log(req, 'dispatchMessage', { result, status: 'no_route', message, device });
+    return Promise.resolve(result);
   }
   //  Get the next step and publish the message there.
   //  Don't use shift() because it mutates the original object:
@@ -898,10 +652,13 @@ function dispatchMessage(req, oldMessage, device) {
   message.route = message.route.slice(1);
   let dev = null;
   let type = message.type;
-  if (type === 'all') {
-    //  Send to sigfox.devices.deviceid when type=all.
-    type = null;
-    dev = device;
+  if (isAWS) {
+    //  TODO: Harmonise the routing logic between AWS and Google Cloud.
+    if (type === 'all') {
+      //  For AWS, send to sigfox.devices.deviceid when type=all.
+      type = null;
+      dev = device;
+    }
   }
   const route = message.route;
   const destination = type;
@@ -972,7 +729,7 @@ function main(event, task) {
   //  Continue the root-level span (created in sigfoxCallback) to trace this request across Cloud Functions.
   getRootSpan(req, rootTraceId);
   //  Write the first log record in Cloud Logging as "start".
-  log(req, 'start', { device, body, event, message, cloudCredentials });
+  log(req, 'start', { device, body, event, message });
 
   //  If the message is already processed by another server, skip it.
   return isProcessedMessage(req, message)
@@ -981,7 +738,7 @@ function main(event, task) {
         ? log(req, 'skip', { result: message, isProcessed, device, body, event, message })
         //  Else wait for the task to complete then dispatch the next step.
         : runTask(req, event, task, device, body, message)
-        //  Suppress all errors else AWS will retry the message.
+        //  Suppress all errors else Google or AWS will retry the message.
           .catch(dumpError)
     ))
     //  Log the final result i.e. the dispatched message.
@@ -995,27 +752,42 @@ function main(event, task) {
 //  region Exports
 
 module.exports = {
-  projectId: process.env.GCLOUD_PROJECT,
-  functionName: process.env.FUNCTION_NAME || 'unknown_function',
+  isGoogleCloud,
+  isAWS,
+  projectId: cloud.projectId,
+  functionName: cloud.functionName,
   sleep,
   removeNulls,
-  dumpError,
-  dumpNullError,
-  createTraceID,
-  startRootSpan,
+
+  //  Logging
   log,
   error: log,
   flushLog,
   logQueue,
+
+  //  Instrumentation
+  dumpError,
+  dumpNullError,
+  createTraceID,
+  startRootSpan,
+
+  //  Messaging
   publishJSON,
   publishMessage,
   updateMessageHistory,
   dispatchMessage,
+
+  //  Device State: device state functions for AWS.  Not implemented for Google Cloud yet.
+  createDevice: cloud.createDevice,
+  getDeviceState: cloud.getDeviceState,
+  updateDeviceState: cloud.updateDeviceState,
+
+  //  Startup
+  init: cloud.init,
   main,
   endTask,
 
-  //  Optional Config
-  //  Log to PubSub: Specify array of { projectId, topicName }
+  //  Optional Config - Log to PubSub: Specify array of { projectId, topicName }
   logQueueConfig: [],
   setLogQueue: (config) => { module.exports.logQueueConfig = config; },
 
@@ -1023,11 +795,6 @@ module.exports = {
   transformRoute: (req, type, device, credentials, topicName) =>
     ({ credentials: Object.assign({}, credentials), topicName }),
   setRoute: (route) => { module.exports.transformRoute = route; },
-
-  //  AWS utility functions.
-  awsCreateDevice,
-  awsGetDeviceState,
-  awsUpdateDeviceState,
 
   //  For unit test only.
   getRootSpan,

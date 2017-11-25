@@ -1,6 +1,6 @@
 {
   "name": "sigfox-aws",
-  "version": "0.0.34",
+  "version": "1.0.0",
   "description": "Framework for building a Sigfox server, based on Amazon Web Services and Lambda Functions",
   "main": "index.js",
   "scripts": {
@@ -27,9 +27,6 @@
     "dnscache": "^1.0.1",
     "dotenv": "^4.0.0",
     "json-stringify-safe": "^5.0.1",
-    "moment": "^2.18.1",
-    "node-fetch": "^1.6.3",
-    "safe-buffer": "5.0.1",
     "uuid": "^3.1.0"
   },
   "devDependencies": {

@@ -2,23 +2,43 @@
 //  Copy and paste the entire contents of this file into a Lambda Function
 //  Name: sigfoxCallback
 //  Runtime: Node.js 6.10
+//  Handler: index.main
 //  Memory: 512 MB
 //  Timeout: 1 min
-//  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
+//  Existing Role: lambda_iot Role, which has the LambdaExecuteIoTUpdate Policy
+//    (defined in ../policy/LambdaExecuteIoTUpdate.json)
 //  Debugging: Enable active tracing
 //  Environment Variables: NODE_ENV=production
 
-//  Add a trigger for API Gateway:
-//  Name: sigfoxGateway
+//  Create an API Gateway named sigfoxGateway (New API, Edge optimised)
+//  In the sigfoxCallback configuration, add a trigger from sigfoxGateway
+//  API Name: sigfoxGateway
+//  Deployment Stage: prod
+//  Security: Open
 //  Method: ANY
 //  Resource path: /sigfoxCallback
 //  Authorization: NONE
-//  Stage: prod
 
-//  Go to AWS Simple Queue Service Console:
-//  Create the queues "sigfox-received", "sigfox-devices-all"
-//  Default Visibility Timeout: 0 seconds
-//  Message Retention Period: 1 day
+//  Invoke URL should look like:
+//  https://8xcb9t7mpj.execute-api.ap-southeast-1.amazonaws.com/prod/sigfoxCallback
+
+/* Test Event: sigfoxCallback
+{
+  "device": "1A2345",
+  "data": "b0513801a421f0019405a500",
+  "time": "1507112763",
+  "duplicate": "false",
+  "snr": "18.86",
+  "station": "1D44",
+  "avgSnr": "15.54",
+  "lat": "1",
+  "lng": "104",
+  "rssi": "-123.00",
+  "seqNumber": "1508",
+  "ack": "false",
+  "longPolling": "false"
+}
+*/
 
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.
@@ -31,17 +51,27 @@
 //  kept as simple as possible to reduce the chance of failure.
 
 /* eslint-disable camelcase, no-console, no-nested-ternary, import/no-dynamic-require, import/newline-after-import, import/no-unresolved, global-require, max-len */
-process.on('uncaughtException', err => console.error(err.message, err.stack));  //  Display uncaught exceptions.
-process.on('unhandledRejection', (reason, p) => console.error('Unhandled Rejection at:', p, 'reason:', reason));
+//  Helper constants to detect if we are running on Google Cloud or AWS.
+const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
+const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+// const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
+
+process.on('uncaughtException', err => console.error('uncaughtException', err.message, err.stack));  //  Display uncaught exceptions.
+process.on('unhandledRejection', (reason, p) => console.error('unhandledRejection', reason, p));
+if (isGoogleCloud) {  //  Start agents for Google Cloud.
+  require('dnscache')({ enable: true });  //  Enable DNS cache in case we hit the DNS quota for Google Cloud Functions.
+  require('@google-cloud/trace-agent').start();  //  Must enable Google Cloud Tracing before other require()
+  require('@google-cloud/debug-agent').start();  //  Must enable Google Cloud Debug before other require()
+}
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
+//  region AWS AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
 
 const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
   {
     "name": "sigfoxCallback",
-    "version": "0.0.1",
+    "version": "2.0.0",
     "author": {
       "name": "Lee Lup Yuen",
       "email": "ly.lee@unabiz.com",
@@ -49,83 +79,16 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
     },
     "license": "MIT",
     "engines": {
-      "node": ">=6.7.0"
+      "node": ">=7.8.0"
     },
     "dependencies": {
       "dnscache": "^1.0.1",
-      "dotenv": "^4.0.0",
-      "sigfox-aws": ">=0.0.34",
-      "safe-buffer": "5.0.1",
-      "node-fetch": "^1.6.3",
-      "json-stringify-safe": "^5.0.1",
+      "sigfox-aws": ">=2.0.0",
       "uuid": "^3.1.0"
-    },
-    "repository": {
-      "type": "git",
-      "url": "git+https://github.com/UnaBiz/sigfox-aws.git"
     }
   }
 //  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
 ; /* eslint-enable quote-props,quotes,comma-dangle,indent */
-
-//  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region AWS Lambda Startup
-
-const mainReq = {};
-const mainRes = {
-  status: (/* code */) => mainRes,  //  TODO
-  json: (/* json */) => mainRes,  //  TODO
-  end: () => mainRes,
-};
-
-function prepareRequest(body) {
-  //  Prepare the request and result objects.
-  mainReq.body = body;
-  /* mainReq.body looks like {
-    device: '1A2345',
-    data: 'b0513801a421f0019405a500',
-    time: '1507112763',
-    duplicate: 'false',
-    snr: '18.86',
-    station: '1D44',
-    avgSnr: '15.54',
-    lat: '1',
-    lng: '104',
-    rssi: '-123.00',
-    seqNumber: '1508',
-    ack: 'false',
-    longPolling: 'false',
-  }; */
-}
-
-// eslint-disable-next-line arrow-body-style
-exports.handler = (event, context, callback) => {
-  console.log(JSON.stringify({ event, env: process.env }, null, 2));
-  //  We will call "done" to return a JSON response.
-  const done = (err, res) => callback(null, {
-    statusCode: err ? '400' : '200',
-    body: err ? err.message : JSON.stringify(res),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  //  Install the dependencies from package_json above.  Will reload the script.
-  //  eslint-disable-next-line no-use-before-define
-  return autoInstall(package_json, event, context, callback)
-    .then((installed) => {
-      if (!installed) return null;  //  Dependencies installing now.  Wait until this Lambda reloads.
-
-      //  Dependencies loaded, so we can use require here.
-      //  Prepare the request and result objects.
-      const body = JSON.parse(event.body);
-      prepareRequest(body);  //  eslint-disable-next-line no-use-before-define
-      return wrap().main(mainReq, mainRes)
-        .then(() => done(null, 'OK'))
-        .catch(error => done(error, null));
-    })
-    .catch(error => done(error, null));
-};
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Portable Code for Google Cloud and AWS
@@ -133,9 +96,10 @@ exports.handler = (event, context, callback) => {
 function wrap() {
   //  Wrap the module into a function so that all we defer loading of dependencies,
   //  and ensure that cloud resources are properly disposed.
-
-  require('dnscache')({ enable: true });  //  Enable DNS cache in case we hit the DNS quota
-  const scloud = require('sigfox-aws'); //  sigfox-aws Framework
+  const scloud =
+    isGoogleCloud ? require('sigfox-gcloud') :  //  sigfox-gcloud Framework
+    isAWS ? require('sigfox-aws') :  //  sigfox-aws Framework
+    null;
   const uuid = require('uuid');
 
   function getResponse(req, device0, body /* , msg */) {
@@ -165,15 +129,51 @@ function wrap() {
   }
 
   function saveMessage(req, device, type, body, rootTraceId) {
-    //  Save the message to sigfox.received queue.
+    //  Save the received message for processing by other modules.
+    //  TODO: The message saving logic is currently different for AWS and Google Cloud:
+    //
+    //  For AWS: Save the received message to sigfox.received queue.
+    //
+    //  For Google Cloud: Save the message to Google PubSub in 3 message queues:
+    //  (1) sigfox.devices.all (the queue for all devices)
+    //  (2) sigfox.devices.<deviceID> (the device specific queue)
+    //  (3) sigfox.types.<deviceType> (the specific device type e.g. gps)
+    //
+    //  There may be another Cloud Function waiting on sigfox.received or sigfox.devices.all
+    //  to process this message e.g. routeMessage.
+    //  Where does device type come from?  It's specified in the callback URL
+    //  e.g. https://myproject.appspot.com?type=gps
     scloud.log(req, 'saveMessage', { device, type, body, rootTraceId });
+    const queues = [];
     const query = req.query;
     //  Compose the message and record the history.
     const message0 = { device, type, body, query, rootTraceId };
     const message = scloud.updateMessageHistory(req, message0, device);
-    //  Publish the message to the sigfox.received queue.
-    return scloud.publishMessage(req, message, null, null)
-      //  Return the message with dispatch flag set so we don't resend.
+    if (isGoogleCloud) {
+      //  For Google Cloud: Send to 3 queues...
+      queues.push({ device: 'all' });  //  sigfox.devices.all (the queue for all devices)
+      if (type) queues.push({ type });  //  sigfox.types.<deviceType>
+      //  This queue may not exist and cause errors, so we send last.
+      if (device) queues.push({ device });  //  sigfox.devices.<deviceID> (the device specific queue)
+    } else if (isAWS) {
+      //  For AWS: Send to 1 queues - sigfox.received.
+      //  We will deliver to the above 3 queues after all the routes have run.
+      queues.push({ device: null, type: null });  //  (null,null) means "sigfox.received"
+    }
+    //  Get a list of promises, one for each publish operation to each queue.
+    const promises = [];
+    for (const queue of queues) {
+      //  Send message to each queue, either the device ID or message type queue.
+      const promise = scloud.publishMessage(req, message, queue.device, queue.type)
+        .catch((error) => {
+          scloud.log(req, 'saveMessage', { error, device, type, body, rootTraceId });
+          return error;  //  Suppress the error so other sends can proceed.
+        });
+      promises.push(promise);
+    }
+    //  Wait for the messages to be published to the queues.
+    return Promise.all(promises)
+    //  Return the message with dispatch flag set so we don't resend.
       .then(() => scloud.log(req, 'saveMessage', { result: message, device, type, body, rootTraceId }))
       .then(() => Object.assign({}, message, { isDispatched: true }))
       .catch((error) => { throw error; });
@@ -232,7 +232,7 @@ function wrap() {
     const rootTraceId = msg.rootTraceId;
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
-    if (body.baseStationTime) {
+    if (isAWS && body.baseStationTime) {
       const baseStationTime = parseInt(body.baseStationTime, 10);
       const age = Date.now() - (baseStationTime * 1000);
       console.log({ baseStationTime });
@@ -242,23 +242,33 @@ function wrap() {
       }
     }
     let result = null;
-    //  Send the Sigfox message to the sigfox.received queue.
+    //  Send the Sigfox message to the queues.
     return saveMessage(req, device, type, body, rootTraceId)
       .then((newMessage) => { result = newMessage; return newMessage; })
       //  Wait for the downlink data if any.
       .then(() => getResponse(req, device, body0, msg))
-      //  Return the response to Sigfox Cloud.
-      .then(response => res.status(200).json(response).end())
-      .then(() => result)
-      .catch((error) => { throw error; });
+      .catch(scloud.dumpError)
+      //  Log the final result.
+      .then(() => scloud.log(req, 'result', { result, device, body }))
+      //  Flush the log and wait for it to be completed.
+      //  After this point, don't use common.log since the log has been flushed.
+      .then(() => scloud.endTask(req).catch(scloud.dumpError))
+      //  Return the response to Sigfox Cloud and terminate the Cloud Function.
+      //  Sigfox needs HTTP code 204 to indicate downlink.
+      .then(response => res.status(204).json(response).end())
+      .then(() => result);
   }
 
-  function main(req0, res) {
+  function main(para1, para2, para3) {
     //  This function is exposed as a HTTP request to handle callbacks from
     //  Sigfox Cloud.  The Sigfox message is contained in the request.body.
     //  Get the type from URL e.g. https://myproject.appspot.com?type=gps
-    const req = Object.assign({}, req0);  //  Clone the request.
-    req.res = res;
+
+    //  Google Cloud and AWS pass parameters differently.
+    //  We send to the respective modules to decode.
+    const para = scloud.init(para1, para2, para3);
+    const req = para.req;  //  HTTP Request Interface
+    // const res = para.res;  //  HTTP Response Interface
     req.starttime = Date.now();
     //  Start a root-level span to trace the request across Cloud Functions.
     const rootTrace = scloud.startRootSpan(req).rootTrace;
@@ -288,38 +298,38 @@ function wrap() {
     let updatedMessage = oldMessage;
     scloud.log(req, 'start', { device, body, event, rootTraceId });
 
-    //  Now we run the task to publish the message to the 3 queues.
-    //  Wait for the task to complete then dispatch to next step.
-    const runTask = task(req, device, body, oldMessage)
-      .then(result => scloud.log(req, 'result', { result, device, body, event, oldMessage }))
-      .then((result) => { updatedMessage = result; return result; })
-      .catch(error => scloud.log(req, 'error', { error, device, body, event, oldMessage }));
-    const dispatchTask = runTask
-      //  Dispatch will be skipped because isDispatched is set.
-      .then(() => scloud.dispatchMessage(req, updatedMessage, device))
-      .catch(error => scloud.log(req, 'error', { error, device, body, event, updatedMessage }));
-    return dispatchTask
-      //  Flush the log and wait for it to be completed.
-      .then(() => scloud.endTask(req))
+    //  Now we run the task to publish the message to the queues.
+    //  Wait for the publish task to complete.
+    return task(req, device, body, oldMessage)
+      //  At the point, don't use common.log since the log has been flushed.
+      //  The response has been closed so the Cloud Function will terminate soon.
+      //  Don't do any more processing here.
+      .then((result) => { updatedMessage = result; })
+      .catch(scloud.dumpError)
+      //  Return the updated message.
       .then(() => updatedMessage);
   }
 
   return {
     //  Expose these functions outside of the wrapper.
+    //  "main" is called to execute the wrapped function when the dependencies and wrapper have been loaded.
     main,
   };
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Standard Code for AutoInstall.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
+//  region Standard Code for AutoInstall Startup Function.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
 
-/* eslint-disable curly, brace-style, import/no-absolute-path */
-let autoinstallPromise = null;  //  Cached autoinstall module.
-function autoInstall(package_json0, event0, context0, callback0) {
-  //  Set up autoinstall to install any NPM dependencies.  Returns a promise
-  //  for "true" when the autoinstall has completed and the script has relaunched.
-  //  Else return a promise for "false" to indicate that dependencies are being installed.
-  if (__filename.indexOf('/tmp') === 0) return Promise.resolve(true);
+/* eslint-disable curly, brace-style, import/no-absolute-path, no-use-before-define */
+exports.main = isAWS ? ((event0, context0, callback0, wrap0) => {
+  //  exports.main is the AWS Lambda and Google Cloud Function startup function.
+  //  When called by AWS, it loads the autoinstall script from GitHub to install any NPM dependencies.
+  //  For first run, install the dependencies specified in package_json and proceed to next step.
+  //  For future runs, just execute the wrapper function with the event, context, callback parameters.
+  //  Returns a promise.
+  if (event0.unittest || __filename.indexOf('/tmp') === 0) {
+    if (!wrapper.main) wrapper = wrap0(package_json);  //  Already installed or in unit test.
+    return wrapper.main.bind(wrapper)(event0, context0, callback0); }  //  Run the wrapper.
   const sourceCode = require('fs').readFileSync(__filename);
   if (!autoinstallPromise) autoinstallPromise = new Promise((resolve, reject) => {
     //  Copy autoinstall.js from GitHub to /tmp and load the module.
@@ -332,16 +342,21 @@ function autoInstall(package_json0, event0, context0, callback0) {
         return resolve(require('/tmp/autoinstall')); }); })
       .on('error', (err) => { autoinstallPromise = null; console.error('setupAutoInstall failed', err.message, err.stack); return reject(err); }); });
   return autoinstallPromise
-    .then(mod => mod.install(package_json0, event0, context0, callback0, sourceCode))
-    .then(() => false)
+    .then(mod => mod.install(package_json, event0, context0, callback0, sourceCode))
     .catch((error) => { throw error; });
-} /* eslint-enable curly, brace-style, import/no-absolute-path */
+})// When exports.main is called by Google Cloud, we create
+  //  a wrapper and pass 1 or 2 parameters depending on the
+  //  launch mode: HTTP Mode or PubSub Queue Mode.
+  //  Google Cloud handles the callback differently when we ask for different number of parameters.
+  : ((process.env.FUNCTION_TRIGGER_TYPE === 'HTTP_TRIGGER')
+  ? ((req0, res0) => //  HTTP request. Create a new wrapper if empty.
+    Object.assign(wrapper, wrapper.main ? null : wrap())
+      .main.bind(wrapper)(req0, res0))  //  Run the HTTP wrapper.
+  : (event0 =>  //  PubSub or File request. Create a new wrapper if empty.
+    Object.assign(wrapper, wrapper.main ? null : wrap())
+      .main.bind(wrapper)(event0))  //  Run the PubSub wrapper.
+); /* eslint-enable curly, brace-style, import/no-absolute-path, no-use-before-define */
+let wrapper = {};  //  The single reused wrapper instance (initially empty) for invoking the module functions.
+let autoinstallPromise = null;  //  Holds a cached autoinstall module for reuse.
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Expected Output
-
-/*
-*/
-
-//  //////////////////////////////////////////////////////////////////////////////////// endregion
-
