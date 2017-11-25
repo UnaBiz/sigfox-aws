@@ -117,7 +117,7 @@ function startRootSpan(req, rootTrace0) {
   //  https://github.com/zbjornson/gcloud-trace/blob/master/src/index.js
   //  Create the root trace.
   const labels = {};
-  const rootTrace = rootTrace0 || cloud.tracing.startTrace();
+  const rootTrace = rootTrace0 || cloud.startTrace(req);
   //  Start the span.
   const rootSpanName = getSpanName(req);
   const rootSpan = rootTrace.startSpan(rootSpanName, labels);
@@ -763,23 +763,36 @@ module.exports = {
   functionName: cloud.functionName,
   sleep,
   removeNulls,
-  dumpError,
-  dumpNullError,
-  createTraceID,
-  startRootSpan,
+
+  //  Logging
   log,
   error: log,
   flushLog,
   logQueue,
+
+  //  Instrumentation
+  dumpError,
+  dumpNullError,
+  createTraceID,
+  startRootSpan,
+
+  //  Messaging
   publishJSON,
   publishMessage,
   updateMessageHistory,
   dispatchMessage,
+
+  //  Device State: device state functions for AWS.  Not implemented for Google Cloud yet.
+  createDevice: cloud.createDevice,
+  getDeviceState: cloud.getDeviceState,
+  updateDeviceState: cloud.updateDeviceState,
+
+  //  Startup
+  init: cloud.init,
   main,
   endTask,
 
-  //  Optional Config
-  //  Log to PubSub: Specify array of { projectId, topicName }
+  //  Optional Config - Log to PubSub: Specify array of { projectId, topicName }
   logQueueConfig: [],
   setLogQueue: (config) => { module.exports.logQueueConfig = config; },
 
@@ -787,11 +800,6 @@ module.exports = {
   transformRoute: (req, type, device, credentials, topicName) =>
     ({ credentials: Object.assign({}, credentials), topicName }),
   setRoute: (route) => { module.exports.transformRoute = route; },
-
-  //  AWS device state functions.  Not implemented for Google Cloud.
-  createDevice: cloud.createDevice,
-  getDeviceState: cloud.getDeviceState,
-  updateDeviceState: cloud.updateDeviceState,
 
   //  For unit test only.
   getRootSpan,
