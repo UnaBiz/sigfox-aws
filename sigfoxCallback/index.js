@@ -24,9 +24,10 @@
 //  https://8xcb9t7mpj.execute-api.ap-southeast-1.amazonaws.com/prod/sigfoxCallback
 
 /* eslint-disable no-unused-vars */
-//  Use this test event for testing
+//  Use this test event for testing.  The "time" field should be set to number of seconds
+//  since 1970 Jan 1 UTC (e.g. 1511614827).  Use Chrome console to compute: Date.now() / 1000
 const testEvent = `{
-  "body": "{\\"device\\":\\"1A2345\\",\\"data\\":\\"b0513801a421f0019405a500\\",\\"time\\":\\"1507112763\\",\\"duplicate\\":\\"false\\",\\"snr\\":\\"18.86\\",\\"station\\":\\"1D44\\",\\"avgSnr\\":\\"15.54\\",\\"lat\\":\\"1\\",\\"lng\\":\\"104\\",\\"rssi\\":\\"-123.00\\",\\"seqNumber\\":\\"1508\\",\\"ack\\":\\"false\\",\\"longPolling\\":\\"false\\"}",
+  "body": "{\\"device\\":\\"1A2345\\",\\"data\\":\\"b0513801a421f0019405a500\\",\\"time\\":\\"1511714827\\",\\"duplicate\\":\\"false\\",\\"snr\\":\\"18.86\\",\\"station\\":\\"1D44\\",\\"avgSnr\\":\\"15.54\\",\\"lat\\":\\"1\\",\\"lng\\":\\"104\\",\\"rssi\\":\\"-123.00\\",\\"seqNumber\\":\\"1508\\",\\"ack\\":\\"false\\",\\"longPolling\\":\\"false\\"}",
   "resource": "/{proxy+}",
   "requestContext": {
     "resourceId": "123456",
@@ -144,6 +145,7 @@ function wrap(/* package_json */) {
     isAWS ? require('sigfox-aws') :  //  sigfox-aws Framework
     null;
   const uuid = require('uuid');
+  let wrapCount = 0;
 
   function getResponse(req, device0, body /* , msg */) {
     //  Compose the callback response to Sigfox Cloud and return as a promise.
@@ -306,7 +308,7 @@ function wrap(/* package_json */) {
     //  This function is exposed as a HTTP request to handle callbacks from
     //  Sigfox Cloud.  The Sigfox message is contained in the request.body.
     //  Get the type from URL e.g. https://myproject.appspot.com?type=gps
-
+    console.log({ wrapCount }); wrapCount += 1;  //  Count how many times the wrapper was reused.
     //  Google Cloud and AWS pass parameters differently.
     //  We send to the respective modules to decode.
     const para = scloud.init(para1, para2, para3);
