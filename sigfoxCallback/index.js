@@ -93,7 +93,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Portable Code for Google Cloud and AWS
 
-function wrap() {
+function wrap(/* package_json */) {
   //  Wrap the module into a function so that all we defer loading of dependencies,
   //  and ensure that cloud resources are properly disposed.
   const scloud =
@@ -321,14 +321,14 @@ function wrap() {
 //  region Standard Code for AutoInstall Startup Function.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
 
 /* eslint-disable curly, brace-style, import/no-absolute-path, no-use-before-define */
-exports.main = isAWS ? ((event0, context0, callback0, wrap0) => {
+exports.main = isAWS ? ((event0, context0, callback0) => {
   //  exports.main is the AWS Lambda and Google Cloud Function startup function.
   //  When called by AWS, it loads the autoinstall script from GitHub to install any NPM dependencies.
   //  For first run, install the dependencies specified in package_json and proceed to next step.
   //  For future runs, just execute the wrapper function with the event, context, callback parameters.
   //  Returns a promise.
   if (event0.unittest || __filename.indexOf('/tmp') === 0) {
-    if (!wrapper.main) wrapper = wrap0(package_json);  //  Already installed or in unit test.
+    if (!wrapper.main) wrapper = wrap(package_json);  //  Already installed or in unit test.
     return wrapper.main.bind(wrapper)(event0, context0, callback0); }  //  Run the wrapper.
   const sourceCode = require('fs').readFileSync(__filename);
   if (!autoinstallPromise) autoinstallPromise = new Promise((resolve, reject) => {
