@@ -1,4 +1,15 @@
 /* eslint-disable max-len, camelcase, no-console, no-nested-ternary, import/no-dynamic-require, import/newline-after-import, import/no-unresolved, global-require, max-len */
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region AWS AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
+const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
+//  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
+{ "dependencies": {
+  "dnscache": "^1.0.1",
+  "sigfox-aws": ">=1.0.5",
+  "uuid": "^3.1.0" } }
+//  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
+; /* eslint-enable quote-props,quotes,comma-dangle,indent */
+
 //  sigfoxCallback Installation Instructions:
 //  Copy and paste the entire contents of this file into a Lambda Function
 //  Name: sigfoxCallback
@@ -22,68 +33,8 @@
 
 //  Invoke URL should look like:
 //  https://8xcb9t7mpj.execute-api.ap-southeast-1.amazonaws.com/prod/sigfoxCallback
-
-/* eslint-disable no-unused-vars */
-//  Use this test event for testing.  The "time" field should be set to number of seconds
+//  For testing: See ./test/testEvent.json for test event.  The "time" field should be set to number of seconds
 //  since 1970 Jan 1 UTC (e.g. 1511614827).  Use Chrome console to compute: Date.now() / 1000
-const testEvent = `{
-  "body": "{\\"device\\":\\"1A2345\\",\\"data\\":\\"b0513801a421f0019405a500\\",\\"time\\":\\"1511814827\\",\\"duplicate\\":\\"false\\",\\"snr\\":\\"18.86\\",\\"station\\":\\"1D44\\",\\"avgSnr\\":\\"15.54\\",\\"lat\\":\\"1\\",\\"lng\\":\\"104\\",\\"rssi\\":\\"-123.00\\",\\"seqNumber\\":\\"1508\\",\\"ack\\":\\"false\\",\\"longPolling\\":\\"false\\"}",
-  "resource": "/{proxy+}",
-  "requestContext": {
-    "resourceId": "123456",
-    "apiId": "1234567890",
-    "resourcePath": "/{proxy+}",
-    "httpMethod": "POST",
-    "requestId": "c6af9ac6-7b61-11e6-9a41-93e8deadbeef",
-    "accountId": "123456789012",
-    "identity": {
-      "apiKey": null,
-      "userArn": null,
-      "cognitoAuthenticationType": null,
-      "caller": null,
-      "userAgent": "Custom User Agent String",
-      "user": null,
-      "cognitoIdentityPoolId": null,
-      "cognitoIdentityId": null,
-      "cognitoAuthenticationProvider": null,
-      "sourceIp": "127.0.0.1",
-      "accountId": null
-    },
-    "stage": "prod"
-  },
-  "queryStringParameters": {
-    "foo": "bar"
-  },
-  "headers": {
-    "Via": "1.1 08f323deadbeefa7af34d5feb414ce27.cloudfront.net (CloudFront)",
-    "Accept-Language": "en-US,en;q=0.8",
-    "CloudFront-Is-Desktop-Viewer": "true",
-    "CloudFront-Is-SmartTV-Viewer": "false",
-    "CloudFront-Is-Mobile-Viewer": "false",
-    "X-Forwarded-For": "127.0.0.1, 127.0.0.2",
-    "CloudFront-Viewer-Country": "US",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Upgrade-Insecure-Requests": "1",
-    "X-Forwarded-Port": "443",
-    "Host": "1234567890.execute-api.us-east-1.amazonaws.com",
-    "X-Forwarded-Proto": "https",
-    "X-Amz-Cf-Id": "cDehVQoZnx43VYQb9j2-nvCh-9z396Uhbp027Y2JvkCPNLmGJHqlaA==",
-    "CloudFront-Is-Tablet-Viewer": "false",
-    "Cache-Control": "max-age=0",
-    "User-Agent": "Custom User Agent String",
-    "CloudFront-Forwarded-Proto": "https",
-    "Accept-Encoding": "gzip, deflate, sdch"
-  },
-  "pathParameters": {
-    "proxy": "path/to/resource"
-  },
-  "httpMethod": "POST",
-  "stageVariables": {
-    "baz": "qux"
-  },
-  "path": "/path/to/resource"
-}
-`; /* eslint-enable no-unused-vars */
 
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.
@@ -107,32 +58,6 @@ if (isGoogleCloud) {  //  Start agents for Google Cloud.
   require('@google-cloud/trace-agent').start();  //  Must enable Google Cloud Tracing before other require()
   require('@google-cloud/debug-agent').start();  //  Must enable Google Cloud Debug before other require()
 }
-
-//  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region AWS AutoInstall: List all dependencies here, or just paste the contents of package.json. Autoinstall will install these dependencies.
-
-const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
-//  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
-  {
-    "name": "sigfoxCallback",
-    "version": "1.0.0",
-    "author": {
-      "name": "Lee Lup Yuen",
-      "email": "ly.lee@unabiz.com",
-      "url": "http://github.com/unabiz/"
-    },
-    "license": "MIT",
-    "engines": {
-      "node": ">=7.8.0"
-    },
-    "dependencies": {
-      "dnscache": "^1.0.1",
-      "sigfox-aws": ">=1.0.4",
-      "uuid": "^3.1.0"
-    }
-  }
-//  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
-; /* eslint-enable quote-props,quotes,comma-dangle,indent */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Portable Code for Google Cloud and AWS
