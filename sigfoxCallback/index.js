@@ -5,21 +5,40 @@
 //  Handler: index.main
 //  Memory: 512 MB
 //  Timeout: 1 min
-//  Existing Role: lambda_iot (defined according to ../policy/LambdaExecuteIoTUpdate.json)
+//  Existing Role: lambda_iot Role, which has the LambdaExecuteIoTUpdate Policy
+//    (defined in ../policy/LambdaExecuteIoTUpdate.json)
 //  Debugging: Enable active tracing
 //  Environment Variables: NODE_ENV=production
 
-//  Add a trigger for API Gateway:
-//  Name: sigfoxGateway
+//  Create an API Gateway named sigfoxGateway (New API, Edge optimised)
+//  In the sigfoxCallback configuration, add a trigger from sigfoxGateway
+//  API Name: sigfoxGateway
+//  Deployment Stage: prod
+//  Security: Open
 //  Method: ANY
 //  Resource path: /sigfoxCallback
 //  Authorization: NONE
-//  Stage: prod
 
-//  Go to AWS Simple Queue Service Console:
-//  Create the queues "sigfox-received", "sigfox-devices-all"
-//  Default Visibility Timeout: 0 seconds
-//  Message Retention Period: 1 day
+//  Invoke URL should look like:
+//  https://8xcb9t7mpj.execute-api.ap-southeast-1.amazonaws.com/prod/sigfoxCallback
+
+/* Test Event: sigfoxCallback
+{
+  "device": "1A2345",
+  "data": "b0513801a421f0019405a500",
+  "time": "1507112763",
+  "duplicate": "false",
+  "snr": "18.86",
+  "station": "1D44",
+  "avgSnr": "15.54",
+  "lat": "1",
+  "lng": "104",
+  "rssi": "-123.00",
+  "seqNumber": "1508",
+  "ack": "false",
+  "longPolling": "false"
+}
+*/
 
 //  Lambda Function sigfoxCallback is exposed as a HTTPS service
 //  that Sigfox Cloud will callback when delivering a Sigfox message.
