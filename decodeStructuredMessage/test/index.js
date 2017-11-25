@@ -1,6 +1,7 @@
 //  Unit Test for decodeStructuredMessage
 /* global describe:true, it:true, beforeEach:true */
 /* eslint-disable max-len, import/newline-after-import,import/no-extraneous-dependencies,no-unused-vars,no-debugger */
+process.env.AWS_LAMBDA_FUNCTION_NAME = 'decodeStructuredMessage';
 const mockery = require('mockery');
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
