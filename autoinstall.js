@@ -19,7 +19,9 @@ function reloadLambda(event, context, callback) {
     console.log('require', installedSourceFilename);
     const installedModule = require(installedSourceFilename);
     console.log('Calling handler...');
-    return installedModule.handler(event, context, callback);
+    if (installedModule.handler) return installedModule.handler(event, context, callback);
+    if (installedModule.main) return installedModule.main(event, context, callback);
+    throw new Error('Handler not found - should be named "handler" or "main"');
 }
 
 function install(package_json, event, context, callback, sourceCode) {
