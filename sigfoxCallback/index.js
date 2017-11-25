@@ -5,7 +5,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
 { "dependencies": {
   "dnscache": "^1.0.1",
-  "sigfox-aws": ">=1.0.5",
+  "sigfox-aws": ">=1.0.6",
   "uuid": "^3.1.0" } }
 //  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
 ; /* eslint-enable quote-props,quotes,comma-dangle,indent */
@@ -194,42 +194,59 @@ function wrap(/* package_json */) {
     return body;
   } /* eslint-enable no-param-reassign */
 
+  function messageExpired(body) {
+    //  Return true if message is too old (5 mins or older).
+    //  Only check for AWS, not Google Cloud.
+    if (!isAWS) return false;
+    if (!body.baseStationTime) return false;
+    const baseStationTime = parseInt(body.baseStationTime, 10);
+    //  Compute time diff in minutes.
+    const age = (Date.now() - (baseStationTime * 1000.0)) / (60.0 * 1000);
+    if (age > 5.0) {
+      Object.assign(body, { age });
+      return true;
+    }
+    return false;
+  }
+
   function task(req, device, body0, msg) {
     //  Parse the Sigfox fields and send to the queues for device ID and device type.
     //  Then send the HTTP response back to Sigfox cloud.  If there is downlink data, wait for the response.
+    let result = msg;
+    let rejectMessage = false;  //  Set to true if we should reject the message.
+    let response = 'OK';  //  Response to Sigfox.
     const res = req.res;
     const type = msg.type;
     const rootTraceId = msg.rootTraceId;
     //  Convert the text fields into number and boolean values.
     const body = parseSIGFOXMessage(req, body0);
-    //  Only for AWS: Check whether message is too old.
-    if (isAWS && body.baseStationTime) {
-      const baseStationTime = parseInt(body.baseStationTime, 10);
-      const age = Date.now() - (baseStationTime * 1000);
-      if (age > 5 * 60 * 1000) {
-        //  If older than 5 mins, reject. This helps to flush the queue of pending requests.
-        const error = new Error(`Rejecting old message: ${age} seconds diff`);
-        const seqNumber = body.seqNumber;
-        const localdatetime = body.localdatetime;
-        scloud.error(req, 'task', { error, device, seqNumber, localdatetime, baseStationTime });
-        return Promise.resolve(msg);
-      }
+    const seqNumber = body.seqNumber;
+    const localdatetime = body.localdatetime;
+    const baseStationTime = body.baseStationTime;
+    //  Only for AWS: Check whether message is too old. If older than 5 mins, reject. This helps to flush the queue of pending requests.
+    if (messageExpired(body)) {
+      rejectMessage = true;
+      const error = new Error(`Rejecting old message: ${body.age.toFixed(1)} mins diff`);
+      scloud.error(req, 'task', { error, device, seqNumber, localdatetime, baseStationTime });
     }
-    let result = null;
-    //  Send the Sigfox message to the queues.
-    return saveMessage(req, device, type, body, rootTraceId)
-      .then((newMessage) => { result = newMessage; return newMessage; })
+    //  If not rejected, send the Sigfox message to the queues.
+    return (rejectMessage
+      ? Promise.resolve(null)  //  Pass null to next step if rejected.
+      : saveMessage(req, device, type, body, rootTraceId).catch(scloud.dumpError))  // Else send the message.
+      //  Save the result if not null.
+      .then((newMessage) => { if (newMessage) result = newMessage; })
+      .catch(scloud.dumpError)
       //  Wait for the downlink data if any.
       .then(() => getResponse(req, device, body0, msg))
+      .then((resp) => { response = resp; })
       .catch(scloud.dumpError)
-      //  Log the final result.
+      //  Log the final result, then flush the log and wait for it to be deallocated.
+      //  After this point, don't use scloud.log since the log has been flushed.
       .then(() => scloud.log(req, 'result', { result, device, body }))
-      //  Flush the log and wait for it to be completed.
-      //  After this point, don't use common.log since the log has been flushed.
       .then(() => scloud.endTask(req).catch(scloud.dumpError))
       //  Return the response to Sigfox Cloud and terminate the Cloud Function.
       //  Sigfox needs HTTP code 204 to indicate downlink.
-      .then(response => res.status(204).json(response).end())
+      .then(() => res.status(204).json(response).end())
       .then(() => result);
   }
 
