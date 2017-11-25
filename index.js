@@ -213,18 +213,10 @@ function publishJSON(req, topic, obj) {
     // eslint-disable-next-line no-param-reassign
     if (obj.type === null) delete obj.type;
     // eslint-disable-next-line no-param-reassign
-    obj = removeNulls(obj, -100); // eslint-disable-next-line no-param-reassign
-    const buf = new Buffer(JSON.stringify(obj));
+    obj = removeNulls(obj); // eslint-disable-next-line no-param-reassign
+    const buf = new Buffer(stringify(obj));
     const size = buf.length;
-    // maxMessages - The maximum number of messages to buffer before sending a payload.
-    // maxMilliseconds - The maximum duration to wait before sending a payload.
-    const options = {
-      batching: {
-        maxMessages: 0,
-        maxMilliseconds: 0,
-      },
-    };
-    return topic.publisher(options).publish(buf)
+    return topic.publisher().publish(buf)
       .catch((error) => { // eslint-disable-next-line no-use-before-define
         console.error('publishJSON', error.message, error.stack, topic.name, size, buf.toString());
         return error;
@@ -342,7 +334,9 @@ function scheduleLog(req, loggingLog0) {
 
 function flushLog(req) {
   //  We are about to quit.  Write all log items.
-  return writeLog(req, null, true).catch(dumpError);
+  return writeLog(req, null, true)
+    .catch(dumpError)
+    .then(() => console.log('flushLog'));
 }
 
 function getMetadata(para, now, operation) {
@@ -392,7 +386,7 @@ function deferLog(req, action, para0, record, now, operation, loggingLog0) { /* 
             json = stringify(val);
             record[key] = JSON.parse(json);
           } catch (err) {  /* eslint-disable no-console */
-            console.error({ deferLog: err.message, json });
+            console.error('deferLog', err.message, err.stack, json);
           } /* eslint-enable no-console */
         }
         //  Log the user properties.
@@ -415,6 +409,7 @@ function deferLog(req, action, para0, record, now, operation, loggingLog0) { /* 
         const event = {};
         event[key] = para;
         const metadata = getMetadata(para, now, operation);
+        // console.log('deferLog2', key, JSON.stringify(event, null, 2), JSON.stringify(metadata, null, 2)); ////
         return loggingLog0.entry(metadata, event);
       })
       .catch(dumpNullError);
