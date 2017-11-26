@@ -12,7 +12,7 @@
 const exec = require('child_process').exec;
 const fs = require('fs');
 
-const tmp = '/tmp';  //  Relocate code here.
+const tmp = '/tmp/autoinstall';  //  Relocate code here.
 const sourceFilename = 'index.js';
 const packageFilename = 'package.json';
 const installedSourceFilename = `${tmp}/${sourceFilename}`;
@@ -96,8 +96,3 @@ module.exports = {
   install,
   installAndRunWrapper,
 };
-
-/*
- if (!wrapper.main) wrapper = wrap(package_json);  //  Already installed or in unit test.
-    return wrapper.main.bind(wrapper)(event0, context0, callback0); }  //  Run
-*/
