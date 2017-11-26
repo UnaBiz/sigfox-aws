@@ -1,273 +1,203 @@
-'use strict';
+/* eslint-disable camelcase */
+const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
+//  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
+  { "dependencies": {
+    "dnscache": "^1.0.1",
+    "sigfox-aws": ">=1.0.6",
+    "uuid": "^3.1.0" } };
 
-//  List all dependencies here, or just paste the contents of package.json.  
-//  Autoinstall will install these dependencies.
-const package_json = {
-  "name": "autoinstall",
-  "version": "1.0.0",
-  "main": "index.js",
-  "dependencies": {
-    "knex": "^0.13.0",
-    "mysql": "^2.15.0"
+// eslint-disable-next-line no-unused-vars
+const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
+const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Portable Code for Google Cloud and AWS
+
+function wrap() {
+  //  Wrap the module into a function so that all we defer loading of dependencies,
+  //  and ensure that cloud resources are properly disposed.
+  function main(event, context, callback) {
+    console.log('main', { event, context, callback });
+    return callback(null, 'OK');
   }
-};
-
-exports.handler = (event, context, callback) => {
-    //  Install the dependencies from package_json above.  Will reload the script.
-    return autoInstall(package_json, event, context, callback)
-    .then((installed) => {
-        if (!installed) return null;  //  Dependencies installing now.
-        
-        //  Dependencies loaded, so we can use require here.
-        console.log('require knex');
-        const knex = require("knex");
-        console.log('knex.VERSION=', knex.VERSION);
-        return callback(null, 'Complete! ' + __filename);
-    })
-    .catch((error) => callback(error));
-};
-
-let autoinstallPromise = null;  //  Cached autoinstall module.
-function autoInstall(package_json0, event0, context0, callback0) {
-    //  Set up autoinstall to install any NPM dependencies.  Returns a promise
-    //  for "true" when the autoinstall has completed and the script has relaunched.
-    //  Else return a promise for "false" to indicate that dependencies are being installed.
-    if (__filename.indexOf('/tmp') === 0) return Promise.resolve(true);
-    const sourceCode = require('fs').readFileSync(__filename);
-    if (!autoinstallPromise) autoinstallPromise = new Promise((resolve, reject) => {
-        //  Copy autoinstall.js from GitHub to /tmp and load the module.
-        //  TODO: If script already in /tmp, use it.  Else download from GitHub.
-        require('https').get('https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js?random=' + Date.now(), res => {
-            let body = '';  
-            res.on('data', chunk => body += chunk); // Accumulate the data chunks.
-            res.on('end', () => { //  After downloading from GitHub, save to /tmp amd load the module.
-                require('fs').writeFileSync('/tmp/autoinstall.js', body); 
-                return resolve(require('/tmp/autoinstall')); }) })
-                .on('error', err => { autoinstallPromise = null; console.error('setupAutoInstall failed', err.message, err.stack); return reject(err); }); });
-    return autoinstallPromise
-    .then(mod => mod.install(package_json0, event0, context0, callback0, sourceCode))
-    .then(() => false)
-    .catch(error => { throw error; });
+  //  Expose these functions outside of the wrapper.
+  //  "main" is called to execute the wrapped function when the dependencies and wrapper have been loaded.
+  return { main };
 }
 
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Standard Code for AutoInstall Startup Function.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
+
+/* eslint-disable camelcase,no-unused-vars,import/no-absolute-path,import/no-unresolved,no-use-before-define,global-require,max-len,no-tabs */
+function autoinstall(event, context, callback) {
+  //  When AWS starts our Lambda function, we load the autoinstall script from GitHub to install any NPM dependencies.
+  //  For first run, install the dependencies specified in package_json and proceed to next step.
+  //  For future runs, just execute the wrapper function with the event, context, callback parameters.
+  const afterExec = error => error ? callback(error, 'AutoInstall Failed')
+    : require('/tmp/autoinstall').installAndRunWrapper(event, context, callback,
+      package_json, __filename, wrapper, wrap);
+  if (require('fs').existsSync('/tmp/autoinstall.js')) return afterExec(null);  //  Already downloaded.
+  const cmd = 'curl -s -S -o /tmp/autoinstall.js https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js';
+  const child = require('child_process').exec(cmd, { maxBuffer: 1024 * 500 }, afterExec);
+  child.stdout.on('data', console.log); child.stderr.on('data', console.error);
+  return null;
+}
+const wrapper = {};  //  The single reused wrapper instance (initially empty) for invoking the module functions.
+exports.main = isAWS ? autoinstall : null; //  exports.main is the AWS Lambda and Google Cloud Function startup function.
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+
 /* Expected Output:
+START RequestId: 9951bbcd-d24b-11e7-b302-c13b259cd165 Version: $LATEST
+2017-11-26T01:46:20.239Z	total 12
+-rw-rw-r-- 1 sbx_user1060 486 5175 Nov 26 01:46 autoinstall.js
+-rw-rw-r-- 1 sbx_user1060 486 103 Nov 26 01:46 package.json
 
-START RequestId: b76f309c-b5cd-11e7-b46f-4908306acb03 Version: $LATEST
-2017-10-20T19:34:41.738Z	b76f309c-b5cd-11e7-b46f-4908306acb03	total 12
--rw-rw-r-- 1 sbx_user1061 485 2108 Oct 20 19:34 autoinstall.js
--rw-rw-r-- 1 sbx_user1061 485 2501 Oct 20 19:34 index.js
--rw-rw-r-- 1 sbx_user1061 485 142 Oct 20 19:34 package.json
-
-2017-10-20T19:35:13.339Z	b76f309c-b5cd-11e7-b46f-4908306acb03	autoinstall@1.0.0 /tmp
-├─┬ knex@0.13.0 
-│ ├─┬ babel-runtime@6.26.0 
-│ │ ├── core-js@2.5.1 
-│ │ └── regenerator-runtime@0.11.0 
-│ ├── bluebird@3.5.1 
-│ ├─┬ chalk@1.1.3 
-│ │ ├── ansi-styles@2.2.1 
-│ │ ├── escape-string-regexp@1.0.5 
-│ │ ├─┬ has-ansi@2.0.0 
-│ │ │ └── ansi-regex@2.1.1 
-│ │ ├── strip-ansi@3.0.1 
-│ │ └── supports-color@2.0.0 
-│ ├── commander@2.11.0 
-│ ├─┬ debug@2.6.9 
-│ │ └── ms@2.0.0 
-│ ├── generic-pool@2.5.4 
-│ ├── inherits@2.0.3 
-│ ├── interpret@0.6.6 
-│ ├─┬ liftoff@2.2.5 
-│ │ ├── extend@3.0.1 
-│ │ ├─┬ findup-sync@0.4.3 
-│ │ │ ├─┬ detect-file@0.1.0 
-│ │ │ │ └── fs-exists-sync@0.1.0 
-│ │ │ ├─┬ is-glob@2.0.1 
-│ │ │ │ └── is-extglob@1.0.0 
-│ │ │ ├─┬ micromatch@2.3.11 
-│ │ │ │ ├─┬ arr-diff@2.0.0 
-│ │ │ │ │ └── arr-flatten@1.1.0 
-│ │ │ │ ├── array-unique@0.2.1 
-│ │ │ │ ├─┬ braces@1.8.5 
-│ │ │ │ │ ├─┬ expand-range@1.8.2 
-│ │ │ │ │ │ └─┬ fill-range@2.2.3 
-│ │ │ │ │ │ ├── is-number@2.1.0 
-│ │ │ │ │ │ ├── isobject@2.1.0 
-│ │ │ │ │ │ ├─┬ randomatic@1.1.7 
-│ │ │ │ │ │ │ ├─┬ is-number@3.0.0 
-│ │ │ │ │ │ │ │ └── kind-of@3.2.2 
-│ │ │ │ │ │ │ └── kind-of@4.0.0 
-│ │ │ │ │ │ └── repeat-string@1.6.1 
-│ │ │ │ │ ├── preserve@0.2.0 
-│ │ │ │ │ └── repeat-element@1.1.2 
-│ │ │ │ ├─┬ expand-brackets@0.1.5 
-│ │ │ │ │ └── is-posix-bracket@0.1.1 
-│ │ │ │ ├── extglob@0.3.2 
-│ │ │ │ ├── filename-regex@2.0.1 
-│ │ │ │ ├─┬ kind-of@3.2.2 
-│ │ │ │ │ └── is-buffer@1.1.5 
-│ │ │ │ ├─┬ normalize-path@2.1.1 
-│ │ │ │ │ └── remove-trailing-separator@1.1.0 
-│ │ │ │ ├─┬ object.omit@2.0.1 
-│ │ │ │ │ ├─┬ for-own@0.1.5 
-│ │ │ │ │ │ └── for-in@1.0.2 
-│ │ │ │ │ └── is-extendable@0.1.1 
-│ │ │ │ ├─┬ parse-glob@3.0.4 
-│ │ │ │ │ ├─┬ glob-base@0.3.0 
-│ │ │ │ │ │ └── glob-parent@2.0.0 
-│ │ │ │ │ └── is-dotfile@1.0.3 
-│ │ │ │ └─┬ regex-cache@0.4.4 
-│ │ │ │ └─┬ is-equal-shallow@0.1.3 
-│ │ │ │ └── is-primitive@2.0.0 
-│ │ │ └─┬ resolve-dir@0.1.1 
-│ │ │ ├─┬ expand-tilde@1.2.2 
-│ │ │ │ └── os-homedir@1.0.2 
-│ │ │ └─┬ global-modules@0.2.3 
-│ │ │ ├─┬ global-prefix@0.1.5 
-│ │ │ │ ├─┬ homedir-polyfill@1.0.1 
-│ │ │ │ │ └── parse-passwd@1.0.0 
-│ │ │ │ ├── ini@1.3.4 
-│ │ │ │ └─┬ which@1.3.0 
-│ │ │ │ └── isexe@2.0.0 
-│ │ │ └── is-windows@0.2.0 
-│ │ ├── flagged-respawn@0.3.2 
-│ │ ├── rechoir@0.6.2 
-│ │ └─┬ resolve@1.4.0 
-│ │ └── path-parse@1.0.5 
-│ ├── lodash@4.17.4 
-│ ├── minimist@1.1.3 
-│ ├─┬ mkdirp@0.5.1 
-│ │ └── minimist@0.0.8 
-│ ├── pg-connection-string@0.1.3 
-│ ├─┬ readable-stream@1.1.14 
-│ │ ├── core-util-is@1.0.2 
-│ │ ├── isarray@0.0.1 
-│ │ └── string_decoder@0.10.31 
-│ ├── safe-buffer@5.1.1 
-│ ├─┬ tildify@1.0.0 
-│ │ └── user-home@1.1.1 
-│ ├── uuid@3.1.0 
-│ └── v8flags@2.1.1 
-└─┬ mysql@2.15.0 
-├── bignumber.js@4.0.4 
-├─┬ readable-stream@2.3.3 
-│ ├── isarray@1.0.0 
-│ ├── process-nextick-args@1.0.7 
-│ ├── string_decoder@1.0.3 
-│ └── util-deprecate@1.0.2 
-└── sqlstring@2.3.0 
+2017-11-26T01:46:48.600Z	/tmp
+├─┬ dnscache@1.0.1
+│ ├── asap@2.0.6
+│ └─┬ lodash.clone@4.3.2
+│ └── lodash._baseclone@4.5.7
+├─┬ sigfox-aws@1.0.7
+│ ├─┬ aws-sdk@2.156.0
+│ │ ├─┬ buffer@4.9.1
+│ │ │ ├── base64-js@1.2.1
+│ │ │ ├── ieee754@1.1.8
+│ │ │ └── isarray@1.0.0
+│ │ ├── crypto-browserify@1.0.9
+│ │ ├── events@1.1.1
+│ │ ├── jmespath@0.15.0
+│ │ ├── querystring@0.2.0
+│ │ ├── sax@1.2.1
+│ │ ├─┬ url@0.10.3
+│ │ │ └── punycode@1.3.2
+│ │ ├── xml2js@0.4.17
+│ │ └─┬ xmlbuilder@4.2.1
+│ │ └── lodash@4.17.4
+│ ├─┬ aws-xray-sdk-core@1.1.6
+│ │ ├─┬ continuation-local-storage@3.2.1
+│ │ │ ├─┬ async-listener@0.6.8
+│ │ │ │ └── shimmer@1.2.0
+│ │ │ └── emitter-listener@1.1.1
+│ │ ├── moment@2.19.2
+│ │ ├── pkginfo@0.4.1
+│ │ ├── semver@5.4.1
+│ │ ├── underscore@1.8.3
+│ │ └─┬ winston@2.4.0
+│ │ ├── async@1.0.0
+│ │ ├── colors@1.0.3
+│ │ ├── cycle@1.0.3
+│ │ ├── eyes@0.1.8
+│ │ ├── isstream@0.1.2
+│ │ └── stack-trace@0.0.10
+│ ├── dotenv@4.0.0
+│ └── json-stringify-safe@5.0.1
+└── uuid@3.1.0
 
 
-2017-10-20T19:35:13.355Z	b76f309c-b5cd-11e7-b46f-4908306acb03	npm WARN autoinstall@1.0.0 No description
-npm WARN autoinstall@1.0.0 No repository field.
-npm WARN autoinstall@1.0.0 No license field.
+2017-11-26T01:46:48.619Z	npm
+2017-11-26T01:46:48.619Z	WARN tmp No description
 
-2017-10-20T19:35:13.455Z	b76f309c-b5cd-11e7-b46f-4908306acb03	total 20
--rw-rw-r-- 1 sbx_user1061 485 2108 Oct 20 19:34 autoinstall.js
--rw-rw-r-- 1 sbx_user1061 485 2501 Oct 20 19:34 index.js
-drwxrwxr-x 93 sbx_user1061 485 4096 Oct 20 19:35 node_modules
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:34 npm-13-d7a1f87a
--rw-rw-r-- 1 sbx_user1061 485 142 Oct 20 19:34 package.json
+2017-11-26T01:46:48.619Z	npm
+2017-11-26T01:46:48.619Z	WARN
+2017-11-26T01:46:48.619Z	tmp No repository field.
 
-2017-10-20T19:35:13.457Z	b76f309c-b5cd-11e7-b46f-4908306acb03	total 376
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 ansi-regex
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 ansi-styles
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 array-unique
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 arr-diff
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 arr-flatten
-drwxrwxr-x 5 sbx_user1061 485 4096 Oct 20 19:35 babel-runtime
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 bignumber.js
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 bluebird
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 braces
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 chalk
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 commander
-drwxrwxr-x 13 sbx_user1061 485 4096 Oct 20 19:35 core-js
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 core-util-is
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 debug
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 detect-file
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 escape-string-regexp
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 expand-brackets
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 expand-range
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:34 expand-tilde
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 extend
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 extglob
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 filename-regex
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 fill-range
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:34 findup-sync
-drwxrwxr-x 4 sbx_user1061 485 4096 Oct 20 19:35 flagged-respawn
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 for-in
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 for-own
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 fs-exists-sync
-drwxrwxr-x 4 sbx_user1061 485 4096 Oct 20 19:35 generic-pool
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 global-modules
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 global-prefix
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 glob-base
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 glob-parent
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 has-ansi
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 homedir-polyfill
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 inherits
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 ini
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 interpret
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 isarray
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 is-buffer
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-dotfile
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-equal-shallow
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 isexe
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-extendable
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-extglob
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-glob
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-number
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 isobject
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-posix-bracket
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 is-primitive
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:34 is-windows
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 kind-of
-drwxrwxr-x 6 sbx_user1061 485 4096 Oct 20 19:35 knex
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 liftoff
-drwxrwxr-x 3 sbx_user1061 485 20480 Oct 20 19:35 lodash
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 micromatch
-drwxrwxr-x 4 sbx_user1061 485 4096 Oct 20 19:35 minimist
-drwxrwxr-x 6 sbx_user1061 485 4096 Oct 20 19:35 mkdirp
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 ms
-drwxrwxr-x 4 sbx_user1061 485 4096 Oct 20 19:35 mysql
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 normalize-path
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 object.omit
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 os-homedir
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 parse-glob
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 parse-passwd
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 path-parse
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 pg-connection-string
-drw
-2017-10-20T19:35:13.457Z	b76f309c-b5cd-11e7-b46f-4908306acb03	xrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 preserve
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 process-nextick-args
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 randomatic
-drwxrwxr-x 4 sbx_user1061 485 4096 Oct 20 19:35 readable-stream
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 rechoir
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 regenerator-runtime
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 regex-cache
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 remove-trailing-separator
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 repeat-element
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 repeat-string
-drwxrwxr-x 5 sbx_user1061 485 4096 Oct 20 19:35 resolve
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 resolve-dir
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 safe-buffer
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 sqlstring
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 string_decoder
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 strip-ansi
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 supports-color
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:34 tildify
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 user-home
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 util-deprecate
-drwxrwxr-x 4 sbx_user1061 485 4096 Oct 20 19:35 uuid
-drwxrwxr-x 2 sbx_user1061 485 4096 Oct 20 19:35 v8flags
-drwxrwxr-x 3 sbx_user1061 485 4096 Oct 20 19:35 which
+2017-11-26T01:46:48.619Z	npm
+2017-11-26T01:46:48.620Z	WARN tmp No license field.
 
-2017-10-20T19:35:13.477Z	b76f309c-b5cd-11e7-b46f-4908306acb03	require /tmp/index.js
-2017-10-20T19:35:13.478Z	b76f309c-b5cd-11e7-b46f-4908306acb03	Calling handler...
-2017-10-20T19:35:13.478Z	b76f309c-b5cd-11e7-b46f-4908306acb03	require knex
-2017-10-20T19:35:14.418Z	b76f309c-b5cd-11e7-b46f-4908306acb03	Knex:warning - Knex.VERSION is deprecated, you can get the module versionby running require('knex/package').version
-2017-10-20T19:35:14.418Z	b76f309c-b5cd-11e7-b46f-4908306acb03	knex.VERSION= 0.12.6
-END RequestId: b76f309c-b5cd-11e7-b46f-4908306acb03
-REPORT RequestId: b76f309c-b5cd-11e7-b46f-4908306acb03	Duration: 33306.69 ms	Billed Duration: 33400 ms Memory Size: 512 MB Max Memory Used: 217 MB	
+2017-11-26T01:46:48.699Z	total 20
+-rw-rw-r-- 1 sbx_user1060 486 5175 Nov 26 01:46 autoinstall.js
+drwxrwxr-x 42 sbx_user1060 486 4096 Nov 26 01:46 node_modules
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 npm-16-e021d47b
+-rw-rw-r-- 1 sbx_user1060 486 103 Nov 26 01:46 package.json
+
+2017-11-26T01:46:48.718Z	total 180
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 asap
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 async
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 async-listener
+drwxrwxr-x 9 sbx_user1060 486 4096 Nov 26 01:46 aws-sdk
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 aws-xray-sdk-core
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 base64-js
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 buffer
+drwxrwxr-x 7 sbx_user1060 486 4096 Nov 26 01:46 colors
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 continuation-local-storage
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 crypto-browserify
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 cycle
+drwxrwxr-x 5 sbx_user1060 486 4096 Nov 26 01:46 dnscache
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 dotenv
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 emitter-listener
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 events
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 eyes
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 ieee754
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 isarray
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 isstream
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 jmespath
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 json-stringify-safe
+drwxrwxr-x 3 sbx_user1060 486 24576 Nov 26 01:46 lodash
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 lodash._baseclone
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 lodash.clone
+drwxrwxr-x 5 sbx_user1060 486 4096 Nov 26 01:46 moment
+drwxrwxr-x 5 sbx_user1060 486 4096 Nov 26 01:46 pkginfo
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 punycode
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 querystring
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 sax
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 semver
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 shimmer
+drwxrwxr-x 8 sbx_user1060 486 4096 Nov 26 01:46 sigfox-aws
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 stack-trace
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 underscore
+drwxrwxr-x 2 sbx_user1060 486 4096 Nov 26 01:46 url
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 uuid
+drwxrwxr-x 4 sbx_user1060 486 4096 Nov 26 01:46 winston
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 xml2js
+drwxrwxr-x 3 sbx_user1060 486 4096 Nov 26 01:46 xmlbuilder
+
+Creating /tmp/index.js
+require /tmp/index.js
+Calling handler...
+Creating instance of wrap function...
+main { event: { key3: 'value3', key2: 'value2', key1: 'value1' },
+context:
+{ callbackWaitsForEmptyEventLoop: [Getter/Setter],
+done: [Function: done],
+succeed: [Function: succeed],
+fail: [Function: fail],
+logGroupName: '/aws/lambda/testExec',
+logStreamName: '2017/11/26/[$LATEST]0ffb889563d14ffc8b894aeb5f3750b9',
+functionName: 'testExec',
+memoryLimitInMB: '448',
+functionVersion: '$LATEST',
+getRemainingTimeInMillis: [Function: getRemainingTimeInMillis],
+invokeid: '9951bbcd-d24b-11e7-b302-c13b259cd165',
+awsRequestId: '9951bbcd-d24b-11e7-b302-c13b259cd165',
+invokedFunctionArn: 'arn:aws:lambda:ap-southeast-1:112039193356:function:testExec',
+wrapVar: { main: [Function: main] },
+wrapFunc: [Function: wrap],
+autoinstalled: true },
+callback: [Function: callback] }
+END RequestId: 9951bbcd-d24b-11e7-b302-c13b259cd165
+REPORT RequestId: 9951bbcd-d24b-11e7-b302-c13b259cd165	Duration: 29026.45 ms	Billed Duration: 29100 ms Memory Size: 448 MB	Max Memory Used: 225 MB
 */
 
+/* Subsequent Run:
+main { event: { key3: 'value3', key2: 'value2', key1: 'value1' },
+context:
+{ callbackWaitsForEmptyEventLoop: [Getter/Setter],
+done: [Function: done],
+succeed: [Function: succeed],
+fail: [Function: fail],
+logGroupName: '/aws/lambda/testExec',
+logStreamName: '2017/11/26/[$LATEST]0ffb889563d14ffc8b894aeb5f3750b9',
+functionName: 'testExec',
+memoryLimitInMB: '448',
+functionVersion: '$LATEST',
+getRemainingTimeInMillis: [Function: getRemainingTimeInMillis],
+invokeid: '3d980664-d24c-11e7-9152-2fc4c4c41b37',
+awsRequestId: '3d980664-d24c-11e7-9152-2fc4c4c41b37',
+invokedFunctionArn: 'arn:aws:lambda:ap-southeast-1:112039193356:function:testExec',
+wrapVar: { main: [Function: main] },
+wrapFunc: [Function: wrap] },
+callback: [Function: callback] }
+END RequestId: 3d980664-d24c-11e7-9152-2fc4c4c41b37
+REPORT RequestId: 3d980664-d24c-11e7-9152-2fc4c4c41b37	Duration: 14.36 ms	Billed Duration: 100 ms Memory Size: 448 MB	Max Memory Used: 225 MB
+*/
