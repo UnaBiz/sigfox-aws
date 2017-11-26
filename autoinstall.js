@@ -12,7 +12,7 @@
 const exec = require('child_process').exec;
 const fs = require('fs');
 
-const tmp = '/tmp/autoinstall';  //  Relocate code here.
+const tmp = '/tmp/autoinstalled';  //  Relocate code here.
 const sourceFilename = 'index.js';
 const packageFilename = 'package.json';
 const installedSourceFilename = `${tmp}/${sourceFilename}`;
@@ -63,7 +63,7 @@ function install(package_json, event, context, callback, sourceCode) {
 
 function installAndRunWrapper(event, context, callback, package_json, sourceFile,
   wrapVar, wrapFunc) { /* eslint-disable no-param-reassign */
-  //  Copy the specified Lamba function source file to /tmp/index.js.
+  //  Copy the specified Lambda function source file to /tmp/index.js.
   //  Write package_json to /tmp/package.json.
   //  Then run "npm install" to install dependencies from package.json.
   //  Then reload /tmp/index.js, create an instance of the wrap()

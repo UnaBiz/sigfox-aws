@@ -1,9 +1,9 @@
-/* eslint-disable camelcase */
+/* eslint-disable camelcase,max-len,global-require,import/no-unresolved */
 const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
   { "dependencies": {
     "dnscache": "^1.0.1",
-    "sigfox-aws": ">=1.0.6",
+    "sigfox-aws": ">=1.0.8",
     "uuid": "^3.1.0" } };
 
 // eslint-disable-next-line no-unused-vars
@@ -17,7 +17,8 @@ function wrap() {
   //  Wrap the module into a function so that all we defer loading of dependencies,
   //  and ensure that cloud resources are properly disposed.
   function main(event, context, callback) {
-    console.log('main', { event, context, callback });
+    const scloud = require('sigfox-aws');
+    console.log('main', { event, context, callback, scloud });
     return callback(null, 'OK');
   }
   //  Expose these functions outside of the wrapper.
@@ -37,7 +38,7 @@ function autoinstall(event, context, callback) {
     : require('/tmp/autoinstall').installAndRunWrapper(event, context, callback,
       package_json, __filename, wrapper, wrap);
   if (require('fs').existsSync('/tmp/autoinstall.js')) return afterExec(null);  //  Already downloaded.
-  const cmd = 'curl -s -S -o /tmp/autoinstall.js https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js';
+  const cmd = 'mkdir /tmp/autoinstalled; curl -s -S -o /tmp/autoinstall.js https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js';
   const child = require('child_process').exec(cmd, { maxBuffer: 1024 * 500 }, afterExec);
   child.stdout.on('data', console.log); child.stderr.on('data', console.error);
   return null;
