@@ -12,7 +12,7 @@
 const exec = require('child_process').exec;
 const fs = require('fs');
 
-const tmp = '/tmp/autoinstalled';  //  Relocate code here.
+const tmp = '/tmp';  //  Relocate code here.
 const sourceFilename = 'index.js';
 const packageFilename = 'package.json';
 const installedSourceFilename = `${tmp}/${sourceFilename}`;
@@ -22,7 +22,7 @@ function reloadLambda(event, context, callback) {
   //  Load the relocated Lambda Function at /tmp/autoinstalled/index.js and call it.
   console.log('require', installedSourceFilename);
   const installedModule = require(installedSourceFilename);
-  console.log('Calling handler...');
+  console.log(`Calling handler in ${installedSourceFilename} from ${__filename}...`);
   //  Set a flag so we know that we have reloaded.
   //  eslint-disable-next-line no-param-reassign
   context.autoinstalled = true;
@@ -70,9 +70,9 @@ function installAndRunWrapper(event, context, callback, package_json, sourceFile
   //  function, save into wrapVar and call wrap().main(event, context, callback)
 
   //  Preserve the wrapper in the context so it won't be changed during reload.
-  if (!context.wrapVar) context.wrapVar = wrapVar;
+  //  if (!context.wrapVar) context.wrapVar = wrapVar;
   //  Check whether dependencies are installed.
-  if (!context.autoinstalled && !context.wrapVar.main && !context.unittest) {
+  if (!context.autoinstalled && !context.unittest) {
     //  Dependencies not installed yet.
     //  Read the source code of the Lambda function so that we may
     //  relocate it to /tmp and call it after installing dependencies.
@@ -82,13 +82,13 @@ function installAndRunWrapper(event, context, callback, package_json, sourceFile
     return install(package_json, event, context, callback, sourceCode);
   }
   //  We have been reloaded with dependencies installed.
-  if (!context.wrapVar.main) {
+  if (!wrapVar.main) {
     //  If wrapper not created yet, create it with the wrap function.
-    console.log('Creating instance of wrap function...'); //  eslint-disable-next-line no-param-reassign
-    Object.assign(context.wrapVar, wrapFunc(package_json));
+    console.log('Creating instance of wrap function...', __filename); //  eslint-disable-next-line no-param-reassign
+    Object.assign(wrapVar, wrapFunc(package_json));
   }
   //  Run the wrapper, setting "this" to the wrap instance.
-  return context.wrapVar.main.bind(context.wrapVar)(event, context, callback);
+  return wrapVar.main.bind(wrapVar)(event, context, callback);
 } /* eslint-enable no-param-reassign */
 
 module.exports = {
