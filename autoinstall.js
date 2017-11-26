@@ -1,11 +1,13 @@
-/* eslint-disable global-require,camelcase,import/no-dynamic-require */
+/* eslint-disable global-require,camelcase,import/no-dynamic-require,no-console */
 //  This script allows you to use require(...) for NPM modules in AWS Lambda Functions,
 //  without preinstalling or bundling the dependencies in advance.  The AWS Lambda Function
 //  should call the install() function passing a package.json that lists the
 //  NPM modules to be installed.  The NPM modules will be installed in /tmp/node_modules.
 //  This is meant to replicate the auto NPM install feature in Google Cloud.
 //  This is not as fast as preinstalling and bundling the dependencies,
-//  but it's easier to maintain and faster to prototype.
+//  but it's easier to maintain and faster to prototype.  The first call
+//  is slower because it loads the dependencies, but subsequent calls will
+//  be faster because AWS reuses the dependencies until it spawns another Lambda instance.
 
 const exec = require('child_process').exec;
 const fs = require('fs');
@@ -41,11 +43,9 @@ function install(package_json, event, context, callback, sourceCode) {
   //  Write the provided package.json and call "npm install".
   fs.writeFileSync(installedPackageFilename, JSON.stringify(package_json, null, 2));
   const cmd = `export HOME=${tmp}; cd ${tmp}; ls -l; npm install; ls -l; ls -l node_modules; `;
-
   const child = exec(cmd, { maxBuffer: 1024 * 500 }, (error) => {
     //  NPM command failed.
     if (error) return callback(error, 'AutoInstall Failed');
-
     //  Write the source code file to indicate that we have succeeded.
     console.log('Creating', installedSourceFilename);
     fs.writeFileSync(installedSourceFilename, sourceCode);
@@ -58,14 +58,33 @@ function install(package_json, event, context, callback, sourceCode) {
   return null;
 }
 
-function run(package_json, event, context, callback, sourceFile,
+/* function dependenciesInstalled(event) {
+  //  Return true if dependencies are already installed.
+  if (event.unittest) return true;  //  Unit test.
+  if (__filename.indexOf('/tmp') === 0) return true;
+  return false;
+} */
+
+function installAndRunWrapper(event, context, callback, package_json, sourceFile,
   wrapVar, wrapFunc) {
-  //  wrapVar={}
+  //  Copy the specified Lamba function source file to /tmp/index.js.
+  //  Write package_json to /tmp/package.json.
+  //  Then run "npm install" to install dependencies from package.json.
+  //  Then reload /tmp/index.js, create an instance of the wrap()
+  //  function, save into wrapVar and call wrap().main(event, context, callback)
+
+  //  Read the source code of the Lambda function so that we may
+  //  relocate it to /tmp and call it after installing dependencies.
+  const sourceCode = fs.readFileSync(sourceFile);
+  //  Install the dependencies in package_json.
+  install(package_json, event, context, callback, sourceCode);
+  //  If wrapper not created yet, create it with the wrap function.
   //  eslint-disable-next-line no-param-reassign
-  if (!wrapVar.main) wrapVar = wrapFunc(package_json);  //  Already installed or in unit test.
-  return wrapVar.main.bind(wrapVar)(event, context, callback);  //  Run the wrapper.
+  if (!wrapVar.main) wrapVar = wrapFunc(package_json);
+  return wrapVar.main.bind(wrapVar)(event, context, callback);
 }
 
 module.exports = {
   install,
+  installAndRunWrapper,
 };
