@@ -19,7 +19,7 @@ const installedSourceFilename = `${tmp}/${sourceFilename}`;
 const installedPackageFilename = `${tmp}/${packageFilename}`;
 
 function reloadLambda(event, context, callback) {
-  //  Load the relocated Lambda Function at /tmp/index.js and call it.
+  //  Load the relocated Lambda Function at /tmp/autoinstalled/index.js and call it.
   console.log('require', installedSourceFilename);
   const installedModule = require(installedSourceFilename);
   console.log('Calling handler...');
@@ -32,9 +32,9 @@ function reloadLambda(event, context, callback) {
 }
 
 function install(package_json, event, context, callback, sourceCode) {
-  //  Copy the specified source code to /tmp/index.js. Write package_json to /tmp/package.json.
+  //  Copy the specified source code to /tmp/autoinstalled/index.js. Write package_json to /tmp/package.json.
   //  Then run "npm install" to install dependencies from package.json.
-  //  Finally reload /tmp/index.js and continue execution from the handler.
+  //  Finally reload /tmp/autoinstalled/index.js and continue execution from the handler.
   //  This is not as fast as preinstalling and bundling the dependencies,
   //  but it's easier to maintain and faster to prototype.
 
@@ -52,7 +52,7 @@ function install(package_json, event, context, callback, sourceCode) {
     //  Write the source code file to indicate that we have succeeded.
     console.log('Creating', installedSourceFilename);
     fs.writeFileSync(installedSourceFilename, sourceCode);
-    //  Load the relocated source file at /tmp/index.js and call it.
+    //  Load the relocated source file at /tmp/autoinstalled/index.js and call it.
     return reloadLambda(event, context, callback);
   });
   // Log process stdout and stderr
@@ -63,15 +63,14 @@ function install(package_json, event, context, callback, sourceCode) {
 
 function installAndRunWrapper(event, context, callback, package_json, sourceFile,
   wrapVar, wrapFunc) { /* eslint-disable no-param-reassign */
-  //  Copy the specified Lambda function source file to /tmp/index.js.
+  //  Copy the specified Lambda function source file to /tmp/autoinstalled/index.js.
   //  Write package_json to /tmp/package.json.
   //  Then run "npm install" to install dependencies from package.json.
-  //  Then reload /tmp/index.js, create an instance of the wrap()
+  //  Then reload /tmp/autoinstalled/index.js, create an instance of the wrap()
   //  function, save into wrapVar and call wrap().main(event, context, callback)
 
-  //  Preserve the wrapper in the context so they won't be changed during reload.
+  //  Preserve the wrapper in the context so it won't be changed during reload.
   if (!context.wrapVar) context.wrapVar = wrapVar;
-  if (!context.wrapFunc) context.wrapFunc = wrapFunc;
   //  Check whether dependencies are installed.
   if (!context.autoinstalled && !context.wrapVar.main && !context.unittest) {
     //  Dependencies not installed yet.
@@ -79,14 +78,14 @@ function installAndRunWrapper(event, context, callback, package_json, sourceFile
     //  relocate it to /tmp and call it after installing dependencies.
     const sourceCode = fs.readFileSync(sourceFile);
     //  Install the dependencies in package_json and re-run the
-    //  Lambda function after relocating to /tmp/index.js.
+    //  Lambda function after relocating to /tmp/autoinstalled/index.js.
     return install(package_json, event, context, callback, sourceCode);
   }
   //  We have been reloaded with dependencies installed.
   if (!context.wrapVar.main) {
     //  If wrapper not created yet, create it with the wrap function.
     console.log('Creating instance of wrap function...'); //  eslint-disable-next-line no-param-reassign
-    Object.assign(context.wrapVar, context.wrapFunc(package_json));
+    Object.assign(context.wrapVar, wrapFunc(package_json));
   }
   //  Run the wrapper, setting "this" to the wrap instance.
   return context.wrapVar.main.bind(context.wrapVar)(event, context, callback);
