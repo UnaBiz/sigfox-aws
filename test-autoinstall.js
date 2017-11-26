@@ -10,6 +10,9 @@ const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
 const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
 function autoinstall(event, context, callback) {
+  //  When AWS starts our Lambda function, we load the autoinstall script from GitHub to install any NPM dependencies.
+  //  For first run, install the dependencies specified in package_json and proceed to next step.
+  //  For future runs, just execute the wrapper function with the event, context, callback parameters.
   const afterExec = error => error ? callback(error, 'AutoInstall Failed')
     : require('/tmp/autoinstall').installAndRunWrapper(event, context, callback,
       package_json, __filename, wrapper, wrap);
@@ -19,6 +22,7 @@ function autoinstall(event, context, callback) {
   child.stdout.on('data', console.log); child.stderr.on('data', console.error);
   return null;
 }
+//  exports.main is the AWS Lambda and Google Cloud Function startup function.
 exports.main = isAWS ? autoinstall : null;
 const wrapper = {};
 function wrap() {
