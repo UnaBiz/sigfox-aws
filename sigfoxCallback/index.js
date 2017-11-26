@@ -65,7 +65,7 @@ if (isGoogleCloud) {  //  Start agents for Google Cloud.
 function wrap(/* package_json */) {
   //  Wrap the module into a function so that all we defer loading of dependencies,
   //  and ensure that cloud resources are properly disposed.
-  const scloud =
+  const scloud = // eslint-disable-next-line import/no-extraneous-dependencies
     isGoogleCloud ? require('sigfox-gcloud') :  //  sigfox-gcloud Framework
     isAWS ? require('sigfox-aws') :  //  sigfox-aws Framework
     null;
