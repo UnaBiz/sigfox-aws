@@ -46,10 +46,13 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  This code is critical, all changes must be reviewed.  It must be
 //  kept as simple as possible to reduce the chance of failure.
 
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Common Declarations
+
 //  Helper constants to detect if we are running on Google Cloud or AWS.
 const isGoogleCloud = !!process.env.FUNCTION_NAME || !!process.env.GAE_SERVICE;
-const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-// const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
+const isAWS = !!process.env.AWS_LAMBDA_FUNCTION_NAME; // eslint-disable-next-line no-unused-vars
+const isProduction = (process.env.NODE_ENV === 'production');  //  True on production server.
 
 process.on('uncaughtException', err => console.error('uncaughtException', err.message, err.stack));  //  Display uncaught exceptions.
 process.on('unhandledRejection', (reason, p) => console.error('unhandledRejection', reason, p));
@@ -60,7 +63,7 @@ if (isGoogleCloud) {  //  Start agents for Google Cloud.
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Portable Code for Google Cloud and AWS
+//  region Message Processing Code
 
 function wrap(/* package_json */) {
   //  Wrap the module into a function so that all we defer loading of dependencies,
@@ -263,7 +266,7 @@ function wrap(/* package_json */) {
     req.starttime = Date.now();
     //  Start a root-level span to trace the request across Cloud Functions.
     const rootTrace = scloud.startRootSpan(req).rootTrace;
-    const rootTraceId = rootTrace.traceId;  //  Pass to other Cloud Functions.
+    const rootTraceId = rootTrace ? rootTrace.traceId : null;  //  Pass to other Cloud Functions.
     req.rootTraceId = rootTraceId;
 
     const event = null;
@@ -301,15 +304,13 @@ function wrap(/* package_json */) {
       .then(() => updatedMessage);
   }
 
-  return {
-    //  Expose these functions outside of the wrapper.
-    //  "main" is called to execute the wrapped function when the dependencies and wrapper have been loaded.
-    main,
-  };
+  //  Expose these functions outside of the wrapper.  main() is called to execute
+  //  the wrapped function when the dependencies and wrapper have been loaded.
+  return { main };
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Standard Code for AutoInstall Startup Function.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
+//  region Standard Code for AutoInstall Startup Function.  Do not modify.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
 
 /* eslint-disable camelcase,no-unused-vars,import/no-absolute-path,import/no-unresolved,no-use-before-define,global-require,max-len,no-tabs */
 function autoinstall(event, context, callback) {
@@ -326,12 +327,7 @@ function autoinstall(event, context, callback) {
   return null;
 }
 const wrapper = {};  //  The single reused wrapper instance (initially empty) for invoking the module functions.
-if (isAWS) exports.main = autoinstall; //  exports.main is the AWS Lambda and Google Cloud Function startup function.
-else {  //  For Google Cloud, select the 2-para or 1-para version of main() depending on the call mode: HTTP or PubSub Queue.
-  if (!wrapper.main) Object.assign(wrapper, wrap(package_json));
-  const mainFunc = wrapper.main.bind(wrapper);
-  if (process.env.FUNCTION_TRIGGER_TYPE === 'HTTP_TRIGGER') exports.main = (req0, res0) => mainFunc(req0, res0);
-  else exports.main = event0 => mainFunc(event0);
-}
+exports.main = isAWS ? autoinstall  //  exports.main is the AWS Lambda and Google Cloud Function startup function.
+  : require('sigfox-gcloud/lib/main').getMainFunction(wrapper, wrap, package_json);
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
