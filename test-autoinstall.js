@@ -41,8 +41,7 @@ exports.main = isGoogleCloud ? require('sigfox-gcloud/lib/main').getMainFunction
     if (require('fs').existsSync('/tmp/autoinstall.js')) return afterExec(null);  //  Already downloaded.
     const cmd = 'curl -s -S -o /tmp/autoinstall.js https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js';
     const child = require('child_process').exec(cmd, { maxBuffer: 1024 * 500 }, afterExec);
-    child.stdout.on('data', console.log); child.stderr.on('data', console.error);
-    return null; };
+    child.stdout.on('data', console.log); child.stderr.on('data', console.error); return null; };
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 
 /* Expected Output:

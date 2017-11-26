@@ -5,7 +5,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
 { "dependencies": {
   "dnscache": "^1.0.1",
-  "sigfox-aws": ">=1.0.9",
+  "sigfox-aws": ">=1.0.10",
   "uuid": "^3.1.0" } }
 //  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
 ; /* eslint-enable quote-props,quotes,comma-dangle,indent */
@@ -324,6 +324,5 @@ exports.main = isGoogleCloud ? require('sigfox-gcloud/lib/main').getMainFunction
     if (require('fs').existsSync('/tmp/autoinstall.js')) return afterExec(null);  //  Already downloaded.
     const cmd = 'curl -s -S -o /tmp/autoinstall.js https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js';
     const child = require('child_process').exec(cmd, { maxBuffer: 1024 * 500 }, afterExec);
-    child.stdout.on('data', console.log); child.stderr.on('data', console.error);
-    return null; };
+    child.stdout.on('data', console.log); child.stderr.on('data', console.error); return null; };
 //  //////////////////////////////////////////////////////////////////////////////////// endregion

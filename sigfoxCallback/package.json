@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "dnscache": "^1.0.1",
-    "sigfox-aws": ">=1.0.9",
+    "sigfox-aws": ">=1.0.10",
     "uuid": "^3.1.0"
   }
 }
