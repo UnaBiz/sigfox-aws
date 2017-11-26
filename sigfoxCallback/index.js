@@ -5,7 +5,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////
 { "dependencies": {
   "dnscache": "^1.0.1",
-  "sigfox-aws": ">=1.0.6",
+  "sigfox-aws": ">=1.0.8",
   "uuid": "^3.1.0" } }
 //  PASTE PACKAGE.JSON ABOVE  //////////////////////////////////////////////////////////
 ; /* eslint-enable quote-props,quotes,comma-dangle,indent */
@@ -311,43 +311,21 @@ function wrap(/* package_json */) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Standard Code for AutoInstall Startup Function.  Do not change.  https://github.com/UnaBiz/sigfox-aws/blob/master/autoinstall.js
 
-/* eslint-disable curly, brace-style, import/no-absolute-path, no-use-before-define */
-exports.main = isAWS ? ((event0, context0, callback0) => {
-  //  exports.main is the AWS Lambda and Google Cloud Function startup function.
-  //  When called by AWS, it loads the autoinstall script from GitHub to install any NPM dependencies.
+/* eslint-disable camelcase,no-unused-vars,import/no-absolute-path,import/no-unresolved,no-use-before-define,global-require,max-len,no-tabs */
+function autoinstall(event, context, callback) {
+  //  When AWS starts our Lambda function, we load the autoinstall script from GitHub to install any NPM dependencies.
   //  For first run, install the dependencies specified in package_json and proceed to next step.
   //  For future runs, just execute the wrapper function with the event, context, callback parameters.
-  //  Returns a promise.
-  if (event0.unittest || __filename.indexOf('/tmp') === 0) {
-    if (!wrapper.main) wrapper = wrap(package_json);  //  Already installed or in unit test.
-    return wrapper.main.bind(wrapper)(event0, context0, callback0); }  //  Run the wrapper.
-  const sourceCode = require('fs').readFileSync(__filename);
-  if (!autoinstallPromise) autoinstallPromise = new Promise((resolve, reject) => {
-    //  Copy autoinstall.js from GitHub to /tmp and load the module.
-    //  TODO: If script already in /tmp, use it.  Else download from GitHub.
-    require('https').get(`https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js?random=${Date.now()}`, (res) => {
-      let body = '';
-      res.on('data', (chunk) => { body += chunk; }); // Accumulate the data chunks.
-      res.on('end', () => { //  After downloading from GitHub, save to /tmp amd load the module.
-        require('fs').writeFileSync('/tmp/autoinstall.js', body);
-        return resolve(require('/tmp/autoinstall')); }); })
-      .on('error', (err) => { autoinstallPromise = null; console.error('setupAutoInstall failed', err.message, err.stack); return reject(err); }); });
-  return autoinstallPromise
-    .then(mod => mod.install(package_json, event0, context0, callback0, sourceCode))
-    .catch((error) => { throw error; });
-})// When exports.main is called by Google Cloud, we create
-  //  a wrapper and pass 1 or 2 parameters depending on the
-  //  launch mode: HTTP Mode or PubSub Queue Mode.
-  //  Google Cloud handles the callback differently when we ask for different number of parameters.
-  : ((process.env.FUNCTION_TRIGGER_TYPE === 'HTTP_TRIGGER')
-  ? ((req0, res0) => //  HTTP request. Create a new wrapper if empty.
-    Object.assign(wrapper, wrapper.main ? null : wrap())
-      .main.bind(wrapper)(req0, res0))  //  Run the HTTP wrapper.
-  : (event0 =>  //  PubSub or File request. Create a new wrapper if empty.
-    Object.assign(wrapper, wrapper.main ? null : wrap())
-      .main.bind(wrapper)(event0))  //  Run the PubSub wrapper.
-); /* eslint-enable curly, brace-style, import/no-absolute-path, no-use-before-define */
-let wrapper = {};  //  The single reused wrapper instance (initially empty) for invoking the module functions.
-let autoinstallPromise = null;  //  Holds a cached autoinstall module for reuse.
+  const afterExec = error => error ? callback(error, 'AutoInstall Failed')
+    : require('/tmp/autoinstall').installAndRunWrapper(event, context, callback,
+      package_json, __filename, wrapper, wrap);
+  if (require('fs').existsSync('/tmp/autoinstall.js')) return afterExec(null);  //  Already downloaded.
+  const cmd = 'curl -s -S -o /tmp/autoinstall.js https://raw.githubusercontent.com/UnaBiz/sigfox-aws/master/autoinstall.js';
+  const child = require('child_process').exec(cmd, { maxBuffer: 1024 * 500 }, afterExec);
+  child.stdout.on('data', console.log); child.stderr.on('data', console.error);
+  return null;
+}
+const wrapper = {};  //  The single reused wrapper instance (initially empty) for invoking the module functions.
+exports.main = isAWS ? autoinstall : null; //  exports.main is the AWS Lambda and Google Cloud Function startup function.
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
