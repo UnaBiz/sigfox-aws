@@ -66,7 +66,21 @@ function startTrace(/* req */) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Logging Functions: Log to AWS CloudWatch
 
-/* const a = {
+//  Logger object for AWS.
+const loggingLog = {
+  write: (/* entry */) => {
+    //  Write the log entry to AWS CloudWatch.
+    //  console.log(stringify(entry ? entry.event || '' : '', null, 2));
+    return Promise.resolve({});
+  },
+  entry: (metadata, event) => {
+    //  Create the log event.
+    console.log(JSON.stringify(event, null, 2));
+    return ({ metadata, event });
+  },
+};
+
+/* metadata looks like {
   timestamp: '2017-11-25T14:10:37.669Z',
   severity: 'DEBUG',
   operation: {
@@ -78,9 +92,8 @@ function startTrace(/* req */) {
   resource: {
     type: 'cloud_function',
     labels: {function_name: 'sigfoxCallback'},
-  },
-};
-const b = {
+  }};
+event looks like {
   '____[ 1A2345 ]____saveMessage___________': {
     device: '1A2345',
     body: {
@@ -104,22 +117,7 @@ const b = {
       baseStationTime: 1511814827,
     },
     duration: 0,
-  },
-}; */
-
-//  Logger object for AWS.
-const loggingLog = {
-  write: (/* entry */) => {
-    //  Write the log entry to AWS CloudWatch.
-    //  console.log(stringify(entry ? entry.event || '' : '', null, 2));
-    return Promise.resolve({});
-  },
-  entry: (metadata, event) => {
-    //  Create the log event.
-    console.log(JSON.stringify(event, null, 2));
-    return ({ metadata, event });
-  },
-};
+  }}; */
 
 function getLogger() {
   //  Return the logger object for writing logs.
@@ -155,8 +153,8 @@ function getMetadata(/* req, authClient */) {
 
 function convertMetadata(req, metadata) {
   //  Convert the metadata into a map of keys and values: { key1: val1, key2: val2, ... }
-  //  On AWS we return the same metadata.  Returns a promise.
-  return Promise.resolve(metadata);
+  //  On AWS we return the same metadata.
+  return metadata;
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
