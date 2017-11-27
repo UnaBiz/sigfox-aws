@@ -131,6 +131,35 @@ function reportError(/* req. err, action, para */) {
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region Metadata Functions: Read metadata from environment
+
+function authorizeMetadata(/* req */) {
+  //  Authorize access to metadata.  On AWS do nothing.
+  return Promise.resolve({ result: 'OK' });
+}
+
+function getMetadata(/* req, authClient */) {
+  //  Returns a promise for metadata keys and values: { key1: val1, key2: val2, ... }
+  //  In lieu of the metadata store, we read from the environment variables.
+  //  On Google Cloud the keys can contain '-'.  But AWS environment doesn't allow.
+  //  So we copy all keys with '_' and change to '-' instead.
+  const metadata = Object.assign({}, process.env);
+  const keys = Object.keys(metadata);
+  for (const key of keys) {
+    if (key.indexOf('_') < 0) continue;
+    const val = metadata[key];
+    metadata[key.split('_').join('-')] = val;
+  }
+  return Promise.resolve(metadata);
+}
+
+function convertMetadata(req, metadata) {
+  //  Convert the metadata into a map of keys and values: { key1: val1, key2: val2, ... }
+  //  On AWS we return the same metadata.  Returns a promise.
+  return Promise.resolve(metadata);
+}
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Messaging Functions: Dispatch messages between Cloud Functions via AWS IoT MQTT Queues
 
 const Iot = new AWS.Iot();
@@ -400,6 +429,11 @@ const cloud = {
 
   //  Messaging
   getQueue,
+
+  //  Metadata
+  authorizeMetadata,
+  getMetadata,
+  convertMetadata,
 
   //  Device State
   createDevice,
