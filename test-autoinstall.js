@@ -1,3 +1,4 @@
+//  TODO OBSOLETE: Use sigfox-iot-cloud/test/test-autoinstall.js instead.
 /* eslint-disable camelcase,max-len,global-require,import/no-unresolved */
 const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 //  PASTE PACKAGE.JSON BELOW  //////////////////////////////////////////////////////////

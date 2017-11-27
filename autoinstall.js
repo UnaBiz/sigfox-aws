@@ -1,3 +1,4 @@
+//  TODO OBSOLETE: Use sigfox-iot-cloud/autoinstall.js instead.
 /* eslint-disable global-require,camelcase,import/no-dynamic-require,no-console,max-len */
 //  This script allows you to use require(...) for NPM modules in AWS Lambda Functions,
 //  without preinstalling or bundling the dependencies in advance.  The AWS Lambda Function
