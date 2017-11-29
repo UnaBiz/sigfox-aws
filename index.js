@@ -183,7 +183,7 @@ function sendIoTMessage(req, topic0, payload, parentId) {
   //  to AWS MQTT format like sigfox/devices/all.
   const payloadObj = JSON.parse(payload);
   if (payloadObj.rootTraceId && parentId) {
-    payloadObj.rootTraceId = [payloadObj.rootTraceId, parentId].join('|');
+    payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], parentId].join('|');
   }
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
