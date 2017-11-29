@@ -130,15 +130,15 @@ function reportError(/* req. err, action, para */) {
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
-//  region Metadata Functions: Read metadata from environment
+//  region Metadata Functions: Read function metadata from environment
 
-function authorizeMetadata(/* req */) {
-  //  Authorize access to metadata.  On AWS do nothing.
+function authorizeFunctionMetadata(/* req */) {
+  //  Authorize access to function metadata.  On AWS do nothing.
   return Promise.resolve({ result: 'OK' });
 }
 
-function getMetadata(/* req, authClient */) {
-  //  Returns a promise for metadata keys and values: { key1: val1, key2: val2, ... }
+function getFunctionMetadata(/* req, authClient */) {
+  //  Returns a promise for function metadata keys and values: { key1: val1, key2: val2, ... }
   //  In lieu of the metadata store, we read from the environment variables.
   //  This is done in sigfox-iot-cloud.getMetadata.
   return Promise.resolve({});
@@ -439,8 +439,8 @@ const cloud = {
   getQueue,
 
   //  Metadata
-  authorizeMetadata,
-  getMetadata,
+  authorizeFunctionMetadata,
+  getFunctionMetadata,
 
   //  Device State
   createDevice,
