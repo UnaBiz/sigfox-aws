@@ -7,6 +7,9 @@ process.on('unhandledRejection', (reason, p) => console.error('unhandledRejectio
 const scloud = require('sigfox-aws');
 
 function getMainFunction(wrapper, wrap, package_json) {
+  //  Return the AWS Lambda startup function main(), if defined in the wrap() function.
+  //  If the wrap() function defines task(), return the main() function
+  //  from sigfox-iot-cloud, after passing task() to main().
   if (!wrapper || !wrap) throw new Error('Missing wrapper or wrap function');
   if (!wrapper.main && !wrapper.task) Object.assign(wrapper, wrap(scloud, package_json));
   const mainFunc = wrapper.main ? wrapper.main.bind(wrapper) : scloud.main.bind(wrapper);
