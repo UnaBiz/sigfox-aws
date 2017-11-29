@@ -405,8 +405,27 @@ function init(event, context, callback, task) {
   };
   req.res = res;  //  Save the response object in the request for easy reference.
   const result = { req, res };
+  if (event) result.event = event;
+  if (context) result.context = context;
+  if (callback) {
+    //  Save the callback for use in shutdown().
+    req.callback = callback;
+    result.callback = callback;
+  }
   if (task) result.task = task;
   return result;
+}
+
+function shutdown(req, useCallback, error, result) {
+  //  Close all cloud connections.  If useCallback is true, return the error or result
+  //  to AWS through the callback.
+  if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
+    const callback = req.callback;
+    if (callback && typeof callback === 'function') {
+      return callback(error, result);
+    }
+  }
+  return Promise.resolve(error || result);
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
@@ -445,7 +464,7 @@ const cloud = {
 
   //  Startup
   init,
-  shutdown: (/* req */) => Promise.resolve('OK'),
+  shutdown,
 };
 
 //  Functions common to Google Cloud and AWS are exposed here.  So clients of both clouds will see the same interface.
