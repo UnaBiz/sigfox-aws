@@ -47,17 +47,25 @@ const rootSpanStub = {
   }),
   end: () => ({}),
 };
-const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
+
+// eslint-disable-next-line no-unused-vars
+const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
   startSpan: (/* rootSpanName, labels */) => rootSpanStub,
   end: () => ({}),
 };
 
-const tracing = { startTrace: () => rootTraceStub };
+const tracing = { startTrace: () => rootTraceStub };`;
 
 function createRootTrace(/* req, rootTraceId */) {
   //  Return the root trace for instrumentation.
   const segment = AWSXRay.getSegment();
   console.log('createRootTrace', segment); //
+  const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
+  const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
+    traceId,
+    startSpan: (/* rootSpanName, labels */) => rootSpanStub,
+    end: () => ({}),
+  };
   return rootTraceStub;
 }
 
@@ -65,6 +73,13 @@ function startTrace(/* req */) {
   //  Start the trace.
   const segment = AWSXRay.getSegment();
   console.log('startTrace', segment); //
+  const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
+  const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
+    traceId,
+    startSpan: (/* rootSpanName, labels */) => rootSpanStub,
+    end: () => ({}),
+  };
+  const tracing = { startTrace: () => rootTraceStub };
   return tracing.startTrace();
 }
 
