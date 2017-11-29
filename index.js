@@ -56,11 +56,15 @@ const tracing = { startTrace: () => rootTraceStub };
 
 function createRootTrace(/* req, rootTraceId */) {
   //  Return the root trace for instrumentation.
+  const segment = AWSXRay.getSegment();
+  console.log('createRootTrace', segment); //
   return rootTraceStub;
 }
 
 function startTrace(/* req */) {
   //  Start the trace.
+  const segment = AWSXRay.getSegment();
+  console.log('startTrace', segment); //
   return tracing.startTrace();
 }
 
