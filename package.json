@@ -24,7 +24,7 @@
   "dependencies": {
     "aws-sdk": "^2.140.0",
     "aws-xray-sdk-core": "^1.1.6",
-    "sigfox-iot-cloud": ">=1.0.11"
+    "sigfox-iot-cloud": ">=1.0.12"
   },
   "repository": {
     "type": "git",
