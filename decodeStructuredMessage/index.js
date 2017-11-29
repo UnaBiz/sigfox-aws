@@ -4,7 +4,7 @@
 //  Runtime: Node.js 6.10
 //  Handler: index.main
 //  Memory: 512 MB
-//  Timeout: 1 min
+//  Timeout: 5 min
 //  Existing Role: lambda_iot Role, which has the LambdaExecuteIoTUpdate Policy
 //    (defined in ../policy/LambdaExecuteIoTUpdate.json)
 //  Debugging: Enable active tracing
