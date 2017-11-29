@@ -221,6 +221,7 @@ function getQueue(req, projectId0, topicName) {
           //  This allows us to trace the message processing through AWS X-Ray.
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
+            console.log('subsegment', subsegment); //
             try {
               const msg = JSON.parse(buffer.toString());
               const body = msg.body || msg;
@@ -244,7 +245,7 @@ function getQueue(req, projectId0, topicName) {
           .then(() => sendIoTMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError))
           // TODO: sendSQSMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError),
           .then((res) => {
-            if (subsegment) subsegment.close();
+            // TODO: if (subsegment) subsegment.close();
             return res;
           })
           .catch(error => error);
