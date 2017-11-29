@@ -1,0 +1,32 @@
+{
+  "device": "1A2345",
+  "body": {
+    "uuid": "a01d9606-a2a2-42be-afac-da1128e858e9",
+    "datetime": "2017-11-29 11:35:15",
+    "localdatetime": "2017-11-29 19:35:15",
+    "callbackTimestamp": 1511955315008,
+    "device": "1A2345",
+    "data": "b0513801a421f0019405a500",
+    "duplicate": false,
+    "snr": 18.86,
+    "station": "1D44",
+    "avgSnr": 15.54,
+    "lat": 1,
+    "lng": 104,
+    "rssi": -123,
+    "seqNumber": 1508,
+    "ack": false,
+    "longPolling": false,
+    "timestamp": "1512814827000",
+    "baseStationTime": 1512814827
+  },
+  "history": [
+    {
+      "timestamp": 1511955315008,
+      "end": 1511955315010,
+      "duration": 0,
+      "latency": 0,
+      "function": "sigfoxCallback"
+    }
+  ]
+}
