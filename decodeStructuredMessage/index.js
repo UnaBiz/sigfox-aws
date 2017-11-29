@@ -20,6 +20,9 @@
 //  Condition: (Blank)
 //  Action: Run Lambda Function decodeStructuredMessage
 
+//  Refer to this URL for source code and comments:
+//  https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/decodeStructuredMessage/index.js
+
 //  We set the wrap function and package_json to null indicate that AutoInstall
 //  should install the dependency from environment variable AUTOINSTALL_DEPENDENCY (see above).
 const wrap = null; // eslint-disable-next-line camelcase

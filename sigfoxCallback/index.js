@@ -28,6 +28,9 @@
 //  The "time" field should be set to number of seconds
 //  since 1970 Jan 1 UTC (e.g. 1511614827).  Use Chrome console to compute: Date.now() / 1000
 
+//  Refer to this URL for source code and comments:
+//  https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/sigfoxCallback/index.js
+
 //  We set the wrap function and package_json to null indicate that AutoInstall
 //  should install the dependency from environment variable AUTOINSTALL_DEPENDENCY (see above).
 const wrap = null; // eslint-disable-next-line camelcase
