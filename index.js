@@ -422,7 +422,7 @@ function shutdown(req, useCallback, error, result) {
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
-      return callback(error, result);
+      return Promise.resolve(callback(error, result));
     }
   }
   return Promise.resolve(error || result);
