@@ -221,7 +221,9 @@ function getQueue(req, projectId0, topicName) {
           //  This allows us to trace the message processing through AWS X-Ray.
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
-            console.log('subsegment', subsegment); //
+            const parent = subsegment.segment;
+            const parentId = parent ? parent.id : null;
+            console.log('subsegment', subsegment, 'parent', parent, 'parentId', parentId); //
             try {
               const msg = JSON.parse(buffer.toString());
               const body = msg.body || msg;
