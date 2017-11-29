@@ -405,6 +405,7 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
+  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
