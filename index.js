@@ -1,8 +1,9 @@
+//  region Introduction
 //  sigfox-aws is a framework for building a Sigfox server, based
 //  on Amazon Web Services and AWS IoT.  This module contains the framework functions
 //  used by sigfox-aws Lambda Functions.  They should also work with Linux, MacOS
 //  and Ubuntu on Windows for unit testing.
-/* eslint-disable max-len,import/no-unresolved,import/newline-after-import,arrow-body-style */
+/*  eslint-disable max-len,import/no-unresolved,import/newline-after-import,arrow-body-style */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Declarations - Helper constants to detect if we are running on Google Cloud or AWS.
@@ -368,7 +369,7 @@ function done(req, error, result, statusCode0, callback) {
   });
 }
 
-function init(event, context, callback) {
+function init(event, context, callback, task) {
   //  Run the function in the wrapper, passed as "this".
   //  Call the callback upon success or failure.
   //  Returns a promise.
@@ -401,7 +402,9 @@ function init(event, context, callback) {
     },
   };
   req.res = res;  //  Save the response object in the request for easy reference.
-  return { req, res };
+  const result = { req, res };
+  if (task) result.task = task;
+  return result;
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
@@ -445,3 +448,5 @@ const cloud = {
 
 //  Functions common to Google Cloud and AWS are exposed here.  So clients of both clouds will see the same interface.
 module.exports = require('sigfox-iot-cloud')(cloud);
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion

@@ -1,5 +1,5 @@
 //  Helper for main function
-/*  eslint-disable max-len,camelcase,import/no-extraneous-dependencies,import/no-unresolved,global-require,import/newline-after-import */
+/*  eslint-disable max-len,camelcase,import/no-extraneous-dependencies,import/no-unresolved,global-require,import/newline-after-import,no-console */
 
 process.on('uncaughtException', err => console.error('uncaughtException', err.message, err.stack));  //  Display uncaught exceptions.
 process.on('unhandledRejection', (reason, p) => console.error('unhandledRejection', reason, p));  //  Display uncaught promises.
