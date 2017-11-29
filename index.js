@@ -365,7 +365,7 @@ function init(event, context, callback, task) {
   //  Run the function in the wrapper, passed as "this".
   //  Call the callback upon success or failure.
   //  Returns a promise.
-  console.log('init', { event, context, callback, task });
+  //  console.log('init', { event, context, callback, task });
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
   //  to hang e.g. the knex library in sigfox-aws-data. Also this setting allows us
@@ -409,7 +409,7 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
+  //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
