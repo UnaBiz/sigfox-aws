@@ -335,7 +335,9 @@ function updateDeviceState(req, device0, state) {
 
 function prepareRequest(event /* context */) {
   //  Prepare the request object and return it.
-  const body = JSON.parse(event.body); // eslint-disable-next-line no-param-reassign
+  const body = (typeof event.body === 'string')
+    ? JSON.parse(event.body)  //  For HTTP request.
+    : null;  //  For queue requests.
   return { body, returnStatus: null, returnJSON: null };
 }
 
@@ -373,7 +375,7 @@ function init(event, context, callback, task) {
   //  Run the function in the wrapper, passed as "this".
   //  Call the callback upon success or failure.
   //  Returns a promise.
-
+  console.log('init', { event, context, callback, task });
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
   //  to hang e.g. the knex library in sigfox-aws-data. Also this setting allows us
