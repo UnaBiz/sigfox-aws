@@ -56,10 +56,17 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 
 const tracing = { startTrace: () => rootTraceStub };`;
 
-function createRootTrace(req, traceId) {
+function createRootTrace(req, traceId0) {
   //  Return the root trace for instrumentation.
+  let traceId = traceId0;
+  let parentId = null;
+  if (traceId0 && traceId0.indexOf('|') >= 0) {
+    //  traceId|parentId
+    traceId = traceId0.split('|')[0];
+    parentId = traceId0.split('|')[1];
+  }
   if (traceId) {
-    const segment = new AWSXRay.Segment(traceId);
+    const segment = new AWSXRay.Segment(traceId, null, parentId);
     console.log('createRootTrace', segment); //
   }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
@@ -170,11 +177,14 @@ function getFunctionMetadata(/* req, authClient */) {
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
-function sendIoTMessage(req, topic0, payload) {
+function sendIoTMessage(req, topic0, payload, parentId) {
   //  Send the text message to the AWS IoT MQTT queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const payloadObj = JSON.parse(payload);
+  if (payloadObj.rootTraceId && parentId) {
+    payloadObj.rootTraceId = [payloadObj.rootTraceId, parentId].join('|');
+  }
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
@@ -216,14 +226,18 @@ function getQueue(req, projectId0, topicName) {
     publisher: () => ({
       publish: (buffer) => {
         let subsegment = null;
+        let parent = null;
+        let parentId = null;
         return new Promise((resolve) => {
           //  Publish the message body as an AWS X-Ray annotation.
           //  This allows us to trace the message processing through AWS X-Ray.
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
-            const parent = subsegment.segment;
-            const parentId = parent ? parent.id : null;
-            console.log('subsegment', subsegment, 'parent', parent, 'parentId', parentId); //
+            parent = subsegment.segment;
+            parentId = parent ? parent.id : null;
+            console.log('subsegment', subsegment);
+            console.log('parent', parent);
+            console.log('parentId', parentId); //
             try {
               const msg = JSON.parse(buffer.toString());
               const body = msg.body || msg;
@@ -244,7 +258,7 @@ function getQueue(req, projectId0, topicName) {
             return resolve('OK');
           });
         })
-          .then(() => sendIoTMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError))
+          .then(() => sendIoTMessage(req, topicName, buffer.toString(), parentId).catch(module.exports.dumpError))
           // TODO: sendSQSMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError),
           .then((res) => {
             // TODO: if (subsegment) subsegment.close();
