@@ -56,11 +56,12 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 
 const tracing = { startTrace: () => rootTraceStub };`;
 
-function createRootTrace(/* req, rootTraceId */) {
+function createRootTrace(req, traceId) {
   //  Return the root trace for instrumentation.
-  const segment = AWSXRay.getSegment();
-  console.log('createRootTrace', segment); //
-  const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
+  if (traceId) {
+    const segment = new AWSXRay.Segment(traceId);
+    console.log('createRootTrace', segment); //
+  }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId,
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
