@@ -235,7 +235,8 @@ function getQueue(req, projectId0, topicName) {
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
             parent = subsegment.segment;
-            parentId = parent ? parent.id : null;
+            // parentId = parent ? parent.id : null;
+            parentId = subsegment ? subsegment.id : null;
             console.log('subsegment', subsegment);
             console.log('parent', parent);
             console.log('parentId', parentId); //
