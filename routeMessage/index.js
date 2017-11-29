@@ -19,7 +19,7 @@
 //  Attribute: *
 //  Topic filter: sigfox/received
 //  Condition: (Blank)
-//  Action: Run Lambda Function routeMessage
+//  Action: Invoke Lambda Function routeMessage
 
 //  Refer to this URL for source code and comments:
 //  https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/routeMessage/index.js

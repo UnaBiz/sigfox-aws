@@ -18,7 +18,7 @@
 //  Attribute: *
 //  Topic filter: sigfox/types/decodeStructuredMessage
 //  Condition: (Blank)
-//  Action: Run Lambda Function decodeStructuredMessage
+//  Action: Invoke Lambda Function decodeStructuredMessage
 
 //  Refer to this URL for source code and comments:
 //  https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/decodeStructuredMessage/index.js
