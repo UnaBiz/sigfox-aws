@@ -177,14 +177,15 @@ function getFunctionMetadata(/* req, authClient */) {
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
-function sendIoTMessage(req, topic0, payload, parentId) {
+function sendIoTMessage(req, topic0, payload0, parentId) {
   //  Send the text message to the AWS IoT MQTT queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
-  const payloadObj = JSON.parse(payload);
+  const payloadObj = JSON.parse(payload0);
   if (payloadObj.rootTraceId && parentId) {
     payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], parentId].join('|');
   }
+  const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
