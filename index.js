@@ -66,7 +66,7 @@ function createRootTrace(req, traceId0) {
     parentId = traceId0.split('|')[1];
   }
   if (traceId) {
-    const segment = new AWSXRay.Segment(traceId, parentId);
+    const segment = new AWSXRay.Segment(traceId, null, parentId);
     console.log('createRootTrace', segment); //
   }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
