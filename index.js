@@ -272,7 +272,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     };
     const xray = new AWS.XRay();
     xray.putTraceSegments(params).promise()
-      .catch(error => console.error('openSegment', error.message, error.stack));
+      .catch(error => console.error('sendIoTMessage', error.message, error.stack));
+    console.log('closeRootSegment', rootTraceId, rootSegmentId);
   }
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
