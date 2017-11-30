@@ -24,16 +24,18 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Instrumentation Functions: Trace the execution of this Sigfox Callback across multiple Cloud Functions via AWS X-Ray
 
-let AWSXRay = null;
-let AWS = null;
+// let AWSXRay = null;
+// let AWS = null;
 
 // eslint-disable-next-line no-unused-vars
-const NOTUSED2 = `//  Allow AWS X-Ray to capture trace.
+//  Allow AWS X-Ray to capture trace.
 //  eslint-disable-next-line import/no-unresolved
 const AWSXRay = require('aws-xray-sdk-core');
 AWSXRay.middleware.setSamplingRules({
-  rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
-  default: { fixed_target: 1, rate: 0.5 },
+  rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*',
+    // fixed_target: 0, rate: 0.5
+  }],
+  // default: { fixed_target: 1, rate: 0.5 },
   version: 1,
 });
 
@@ -42,7 +44,7 @@ const AWS = isProduction
   ? AWSXRay.captureAWS(require('aws-sdk'))
   : require('aws-sdk');
 if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
-else AWS.config.loadFromPath('./aws-credentials.json');`;
+else AWS.config.loadFromPath('./aws-credentials.json');
 
 //  TODO: Create spans and traces for logging performance.
 const rootSpanStub = {
@@ -187,8 +189,7 @@ function getFunctionMetadata(/* req, authClient */) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Messaging Functions: Dispatch messages between Cloud Functions via AWS IoT MQTT Queues
 
-// let Iot = new AWS.Iot();
-let Iot = null;
+let Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
 function sendIoTMessage(req, topic0, payload0, subsegmentId, parentId) {
@@ -418,8 +419,8 @@ function init(event, context, callback, task) {
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
   //  Allow AWS X-Ray to capture trace.
-  // eslint-disable-next-line import/no-unresolved,global-require
-  AWSXRay = require('aws-xray-sdk-core');
+  // eslint-disable-next-line import/no-unresolved,global-require,no-unused-vars
+  const NOTUSED3 = `AWSXRay = require('aws-xray-sdk-core');
   AWSXRay.middleware.setSamplingRules({
     rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
     default: { fixed_target: 1, rate: 0.5 },
@@ -432,7 +433,7 @@ function init(event, context, callback, task) {
   if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
   else AWS.config.loadFromPath('./aws-credentials.json');
   Iot = new AWS.Iot();
-  awsIoTDataPromise = null;
+  awsIoTDataPromise = null;`;
   //
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
@@ -489,10 +490,10 @@ function shutdown(req, useCallback, error, result) {
     segment2.close();
     segment2 = null;
   }
-  AWS = null; //
+  /* AWS = null; //
   AWSXRay = null; //
   Iot = null; //
-  awsIoTDataPromise = null; //
+  awsIoTDataPromise = null; // */
 
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
