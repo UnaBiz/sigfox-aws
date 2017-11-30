@@ -187,7 +187,8 @@ function getFunctionMetadata(/* req, authClient */) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Messaging Functions: Dispatch messages between Cloud Functions via AWS IoT MQTT Queues
 
-const Iot = new AWS.Iot();
+// let Iot = new AWS.Iot();
+let Iot = null;
 let awsIoTDataPromise = null;
 
 function sendIoTMessage(req, topic0, payload0, subsegmentId, parentId) {
@@ -430,6 +431,9 @@ function init(event, context, callback, task) {
     : require('aws-sdk');
   if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
   else AWS.config.loadFromPath('./aws-credentials.json');
+  Iot = new AWS.Iot();
+  awsIoTDataPromise = null;
+  //
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
@@ -487,6 +491,9 @@ function shutdown(req, useCallback, error, result) {
   }
   AWS = null; //
   AWSXRay = null; //
+  Iot = null; //
+  awsIoTDataPromise = null; //
+
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
