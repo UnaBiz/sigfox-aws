@@ -68,9 +68,9 @@ const tracing = { startTrace: () => rootTraceStub };`;
 function openSegment(traceId, segmentId, name) {
   //  Open the segment.
   const newSegment = {
-    service: 'myservice',
-    version: '1.23',
-    user: 'user1',
+    // service: 'myservice',
+    // version: '1.23',
+    // user: 'user1',
     name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
