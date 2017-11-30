@@ -481,13 +481,13 @@ function shutdown(req, useCallback, error, result) {
   //  to AWS through the callback.
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
   if (segment1) {
-    console.log('Close segment1', segment1);
-    segment1.close();
+    // console.log('Close segment1', segment1);
+    // segment1.close();
     segment1 = null;
   }
   if (segment2) {
-    console.log('Close segment2', segment2);
-    segment2.close();
+    // console.log('Close segment2', segment2);
+    // segment2.close();
     segment2 = null;
   }
   /* AWS = null; //
