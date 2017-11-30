@@ -33,9 +33,9 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
 const AWSXRay = require('aws-xray-sdk-core');
 AWSXRay.middleware.setSamplingRules({
   rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*',
-    // fixed_target: 0, rate: 0.5
+    fixed_target: 0, rate: 1.0,
   }],
-  // default: { fixed_target: 1, rate: 0.5 },
+  default: { fixed_target: 0, rate: 1.0 },
   version: 1,
 });
 
