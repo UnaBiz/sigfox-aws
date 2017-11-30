@@ -56,18 +56,27 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 
 const tracing = { startTrace: () => rootTraceStub };`;
 
+let segment1 = null;
+let segment2 = null;
+
 function createRootTrace(req, traceId0) {
   //  Return the root trace for instrumentation.
   let traceId = traceId0;
+  let subsegmentId = null;
   let parentId = null;
-  if (traceId0 && traceId0.indexOf('|') >= 0) {
-    //  traceId|parentId
+  if (traceId0 && traceId0.split('|').length == 3) {
+    //  traceId|subsegmentId|parentId
     traceId = traceId0.split('|')[0];
-    parentId = traceId0.split('|')[1];
+    subsegmentId = traceId0.split('|')[1];
+    parentId = traceId0.split('|')[2];
   }
   if (traceId) {
-    const segment = new AWSXRay.Segment(traceId, null, parentId);
-    console.log('createRootTrace', segment); //
+    if (segment1) console.log('segment1 is present');
+    if (segment2) console.log('segment2 is present');
+    segment1 = new AWSXRay.Segment(traceId, null, subsegmentId);
+    segment2 = new AWSXRay.Segment(traceId, null, parentId);
+    console.log('createRootTrace segment1', segment1); //
+    console.log('createRootTrace segment2', segment2); //
   }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId,
@@ -447,6 +456,16 @@ function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
+  if (segment1) {
+    console.log('Close segment1', segment1);
+    segment1.close();
+    segment1 = null;
+  }
+  if (segment2) {
+    console.log('Close segment2', segment2);
+    segment2.close();
+    segment2 = null;
+  }
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
