@@ -64,6 +64,8 @@ const tracing = { startTrace: () => rootTraceStub };`;
 
 // let segment1 = null;
 // let segment2 = null;
+let rootSegmentId = null;
+let rootTraceId = null;
 
 function openSegment(traceId, segmentId, name) {
   //  Open the segment.
@@ -145,6 +147,8 @@ function createRootTrace(req, traceId0) {
     //  traceId|segmentId
     traceId = traceId0.split('|')[0];
     segmentId = traceId0.split('|')[1];
+    rootTraceId = traceId;
+    rootSegmentId = segmentId;
   }
   //  Create the child segment.
   const childSegmentId = newSegmentId();
@@ -254,6 +258,22 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   /* if (payloadObj.rootTraceId && subsegmentId && parentId) {
     payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], subsegmentId, parentId].join('|');
   } */
+  if (payloadObj.metadata && payloadObj.metadata.route && payloadObj.metadata.route.length === 0) {
+    const segment = {
+      id: rootSegmentId,
+      trace_id: rootTraceId,
+      end_time: Date.now() / 1000.0,
+      in_progress: false,
+    };
+    const params = {
+      TraceSegmentDocuments: [
+        JSON.stringify(segment),
+      ],
+    };
+    const xray = new AWS.XRay();
+    xray.putTraceSegments(params).promise()
+      .catch(error => console.error('openSegment', error.message, error.stack));
+  }
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
