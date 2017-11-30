@@ -31,8 +31,8 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
 //  Allow AWS X-Ray to capture trace.
 //  eslint-disable-next-line import/no-unresolved
 const AWSXRay = require('aws-xray-sdk-core');
-AWSXRay.middleware.setSamplingRules({
-  rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*',
+AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-property-newline
+  rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', // eslint-disable-next-line object-property-newline
     fixed_target: 0, rate: 1.0,
   }],
   default: { fixed_target: 0, rate: 1.0 },
@@ -189,7 +189,7 @@ function getFunctionMetadata(/* req, authClient */) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Messaging Functions: Dispatch messages between Cloud Functions via AWS IoT MQTT Queues
 
-let Iot = new AWS.Iot();
+const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
 function sendIoTMessage(req, topic0, payload0, subsegmentId, parentId) {
@@ -544,5 +544,9 @@ const cloud = {
 
 //  Functions common to Google Cloud and AWS are exposed here.  So clients of both clouds will see the same interface.
 module.exports = require('sigfox-iot-cloud')(cloud);
+
+//  For Unit Test
+module.exports.getAWSXRay = () => AWSXRay;
+module.exports.getAWS = () => AWS;
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion

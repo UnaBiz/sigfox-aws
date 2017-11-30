@@ -77,6 +77,24 @@ function getTestMessage(type, device) {
   return testMessage(timestamp, device, testData[type]);
 }
 
+const completeSegment = {
+  "name" : "example.com",
+  "id" : "70de5b6f19ff9a0a",
+  "start_time" : 1.478293361271E9,
+  "trace_id" : "1-581cf771-a006649127e371903a2de979",
+  "end_time" : 1.478293361449E9
+};
+
+const partialSegment = {
+  "name" : "example.com",
+  "id" : "70de5b6f19ff9a0b",
+  "start_time" : 1.478293361271E9,
+  "trace_id" : "1-581cf771-a006649127e371903a2de979",
+  "in_progress": true
+};
+
+let testSegment = null;
+
 describe(moduleName, () => {
   //  Test every exposed function in the module.
 
@@ -91,6 +109,34 @@ describe(moduleName, () => {
     return moduleTested.flushLog(req);
   });
 
+  it('should create segment', () => {
+    testSegment = Object.assign({}, partialSegment);
+    testSegment.start_time = Date.now() / 1000.0;
+    const params = {
+      TraceSegmentDocuments: [
+        JSON.stringify(testSegment),
+      ],
+    };
+    const AWS = moduleTested.getAWS();
+    const xray = new AWS.XRay();
+    return xray.putTraceSegments(params).promise();
+  });
+
+  it('should wait', () => new Promise(resolve => setTimeout(resolve, 5000)));
+
+  it('should close segment', () => {
+    testSegment.end_time = Date.now() / 1000.0;
+    if (testSegment.in_progress) testSegment.in_progress = false;
+    const params = {
+      TraceSegmentDocuments: [
+        JSON.stringify(testSegment),
+      ],
+    };
+    const AWS = moduleTested.getAWS();
+    const xray = new AWS.XRay();
+    return xray.putTraceSegments(params).promise();
+  });
+
   it.skip('should log', () => {
     const msg = getTestMessage('number', testDevice1);
     moduleTested.log(req, 'action123/subAction456', { result: 'OK', number: 789, obj: { level1: { level2: {} } }, msg });
@@ -103,7 +149,7 @@ describe(moduleName, () => {
     return Promise.resolve('OK');
   });
 
-  it('should aggregate values', () => {
+  it.skip('should aggregate values', () => {
     const device = testDevice1;
     const msg = getTestMessage('number', device);
     const scloud = moduleTested;
