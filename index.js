@@ -106,7 +106,7 @@ function closeSegment(segment) {
 function newSegmentId() {
   const trace_id_time = Math.floor(Date.now() / 1000).toString(16);
   let segmentId = (`0000000000000000${trace_id_time}`);
-  segmentId = segmentId.substr(segmentId.id.length - 16);  //  16-digits
+  segmentId = segmentId.substr(segmentId.length - 16);  //  16-digits
   return segmentId;
 }
 
