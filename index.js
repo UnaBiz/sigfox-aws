@@ -65,13 +65,13 @@ const tracing = { startTrace: () => rootTraceStub };`;
 // let segment1 = null;
 // let segment2 = null;
 
-function openSegment(traceId, segmentId) {
+function openSegment(traceId, segmentId, name) {
   //  Open the segment.
   const newSegment = {
     service: 'myservice',
     version: '1.23',
     user: 'user1',
-    name: functionName,
+    name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
     trace_id: traceId,
@@ -119,13 +119,13 @@ function startTrace(/* req */) {
   const segment = AWSXRay.getSegment();
   const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
   const segmentId = newSegmentId();
-  rootSegment = openSegment(traceId, segmentId);
+  rootSegment = openSegment(traceId, segmentId, 'overall');
   console.log('startTrace', segment); //
   console.log('startTrace - rootSegment', rootSegment); //
 
   //  Create the child segment.
   const childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId);
+  childSegment = openSegment(traceId, childSegmentId, functionName);
   console.log('startTrace - childSegment', childSegment); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
@@ -148,7 +148,7 @@ function createRootTrace(req, traceId0) {
   }
   //  Create the child segment.
   const childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId);
+  childSegment = openSegment(traceId, childSegmentId, functionName);
   console.log('createRootTrace - childSegment', childSegment); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
