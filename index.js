@@ -24,7 +24,11 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Instrumentation Functions: Trace the execution of this Sigfox Callback across multiple Cloud Functions via AWS X-Ray
 
-//  Allow AWS X-Ray to capture trace.
+let AWSXRay = null;
+let AWS = null;
+
+// eslint-disable-next-line no-unused-vars
+const NOTUSED2 = `//  Allow AWS X-Ray to capture trace.
 //  eslint-disable-next-line import/no-unresolved
 const AWSXRay = require('aws-xray-sdk-core');
 AWSXRay.middleware.setSamplingRules({
@@ -38,7 +42,7 @@ const AWS = isProduction
   ? AWSXRay.captureAWS(require('aws-sdk'))
   : require('aws-sdk');
 if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
-else AWS.config.loadFromPath('./aws-credentials.json');
+else AWS.config.loadFromPath('./aws-credentials.json');`;
 
 //  TODO: Create spans and traces for logging performance.
 const rootSpanStub = {
@@ -412,6 +416,21 @@ function init(event, context, callback, task) {
   //  Call the callback upon success or failure.
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
+  //  Allow AWS X-Ray to capture trace.
+  // eslint-disable-next-line import/no-unresolved,global-require
+  AWSXRay = require('aws-xray-sdk-core');
+  AWSXRay.middleware.setSamplingRules({
+    rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
+    default: { fixed_target: 1, rate: 0.5 },
+    version: 1,
+  });
+  //  Create the AWS SDK instance.
+  AWS = isProduction // eslint-disable-next-line global-require
+    ? AWSXRay.captureAWS(require('aws-sdk')) // eslint-disable-next-line global-require
+    : require('aws-sdk');
+  if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
+  else AWS.config.loadFromPath('./aws-credentials.json');
+
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
   //  to hang e.g. the knex library in sigfox-aws-data. Also this setting allows us
@@ -466,6 +485,8 @@ function shutdown(req, useCallback, error, result) {
     segment2.close();
     segment2 = null;
   }
+  AWS = null; //
+  AWSXRay = null; //
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
