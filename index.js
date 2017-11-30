@@ -64,7 +64,7 @@ function createRootTrace(req, traceId0) {
   let traceId = traceId0;
   let subsegmentId = null;
   let parentId = null;
-  if (traceId0 && traceId0.split('|').length == 3) {
+  if (traceId0 && traceId0.split('|').length === 3) {
     //  traceId|subsegmentId|parentId
     traceId = traceId0.split('|')[0];
     subsegmentId = traceId0.split('|')[1];
