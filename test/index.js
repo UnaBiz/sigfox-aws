@@ -1,6 +1,6 @@
 //  Unit Test
 /* global describe:true, it:true, beforeEach:true, afterEach:true */
-/* eslint-disable max-len, import/no-extraneous-dependencies, no-console, no-unused-vars, one-var, no-underscore-dangle */
+/* eslint-disable camelcase */
 process.env.AWS_LAMBDA_FUNCTION_NAME = 'unittest';
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
@@ -86,6 +86,9 @@ const completeSegment = {
 };
 
 const partialSegment = {
+  service: 'myservice',
+  version: '1.23',
+  user: 'user1',
   "name" : "example.com",
   "id" : "70de5b6f19ff9a0b",
   "start_time" : 1.478293361271E9,
@@ -112,6 +115,14 @@ describe(moduleName, () => {
   it('should create segment', () => {
     testSegment = Object.assign({}, partialSegment);
     testSegment.start_time = Date.now() / 1000.0;
+    // testSegment.id = '0123456789abcdef';  //  16-digits
+    // testSegment.id = '1123456789abcdef';
+    const trace_id_time = Math.floor(Date.now() / 1000).toString(16);
+    testSegment.id = (`0000000000000000${trace_id_time}`);
+    testSegment.id = testSegment.id.substr(testSegment.id.length - 16);  //  16-digits
+    // testSegment.trace_id = `1-${trace_id_time}-123456789012345678901234`;  //  8 then 24 hex digits
+    testSegment.trace_id = '1-5a1fa47f-214d87333c609e49068f0309';
+    debugger;
     const params = {
       TraceSegmentDocuments: [
         JSON.stringify(testSegment),
