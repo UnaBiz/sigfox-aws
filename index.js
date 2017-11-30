@@ -177,13 +177,13 @@ function getFunctionMetadata(/* req, authClient */) {
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
-function sendIoTMessage(req, topic0, payload0, parentId) {
+function sendIoTMessage(req, topic0, payload0, subsegmentId, parentId) {
   //  Send the text message to the AWS IoT MQTT queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const payloadObj = JSON.parse(payload0);
-  if (payloadObj.rootTraceId && parentId) {
-    payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], parentId].join('|');
+  if (payloadObj.rootTraceId && subsegmentId && parentId) {
+    payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], subsegmentId, parentId].join('|');
   }
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
@@ -227,6 +227,7 @@ function getQueue(req, projectId0, topicName) {
     publisher: () => ({
       publish: (buffer) => {
         let subsegment = null;
+        let subsegmentId = null;
         let parent = null;
         let parentId = null;
         return new Promise((resolve) => {
@@ -235,10 +236,11 @@ function getQueue(req, projectId0, topicName) {
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
             parent = subsegment.segment;
-            // parentId = parent ? parent.id : null;
-            parentId = subsegment ? subsegment.id : null;
+            parentId = parent ? parent.id : null;
+            subsegmentId = subsegment ? subsegment.id : null;
             console.log('subsegment', subsegment);
             console.log('parent', parent);
+            console.log('subsegmentId', subsegmentId); //
             console.log('parentId', parentId); //
             try {
               const msg = JSON.parse(buffer.toString());
@@ -260,7 +262,7 @@ function getQueue(req, projectId0, topicName) {
             return resolve('OK');
           });
         })
-          .then(() => sendIoTMessage(req, topicName, buffer.toString(), parentId).catch(module.exports.dumpError))
+          .then(() => sendIoTMessage(req, topicName, buffer.toString(), subsegmentId, parentId).catch(module.exports.dumpError))
           // TODO: sendSQSMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError),
           .then((res) => {
             // TODO: if (subsegment) subsegment.close();
