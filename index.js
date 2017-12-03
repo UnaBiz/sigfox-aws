@@ -64,14 +64,15 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 
 const tracing = { startTrace: () => rootTraceStub };`;
 
-// let segment1 = null;
-// let segment2 = null;
-let rootSegmentId = null;
-let rootTraceId = null;
+// let parentSegmentId = null;
+let childSegmentId = null;
+let parentSegment = null;
+let childSegment = null;
+let traceId = null;
 
 const prefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join(''); //
 
-function openSegment(traceId, segmentId, parentSegmentId, name) {
+function openSegment(traceId0, segmentId, parentSegmentId0, name) {
   //  Open the segment.
   const newSegment = {
     // service: 'myservice',
@@ -80,10 +81,10 @@ function openSegment(traceId, segmentId, parentSegmentId, name) {
     name: prefix + name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
-    trace_id: traceId,
+    trace_id: traceId0,
     in_progress: true,
   };
-  if (parentSegmentId) newSegment.parent_id = parentSegmentId;
+  if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(newSegment),
@@ -120,21 +121,18 @@ function newSegmentId() {
   return segmentId;
 }
 
-let parentSegment = null;
-let childSegment = null;
-
 function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  Create the root segment.
   const segment = AWSXRay.getSegment();
-  const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
+  traceId = (segment && segment.trace_id) ? segment.trace_id : null;
   // const segmentId = newSegmentId();
   // rootSegment = openSegment(traceId, segmentId, 'overall');
   console.log('startTrace', segment); //
   // console.log('startTrace - rootSegment', rootSegment); //
 
   //  Create the child segment.
-  const childSegmentId = newSegmentId();
+  childSegmentId = newSegmentId();
   childSegment = openSegment(traceId, childSegmentId, segment.id, functionName);
   console.log('startTrace - childSegment:', childSegment, 'parent:', segment.id); //
 
@@ -149,16 +147,15 @@ function startTrace(/* req */) {
 
 function createRootTrace(req, traceId0) {
   //  Return the root trace for instrumentation.  Called by non-sigfoxCallback to continue a trace.
-  let traceId = traceId0;
+  traceId = traceId0;
   let segmentId = null;
   if (traceId0 && traceId0.split('|').length >= 2) {
     //  traceId|segmentId
     traceId = traceId0.split('|')[0];
     segmentId = traceId0.split('|')[1];
-    rootTraceId = traceId;
-    rootSegmentId = segmentId;
   }
   //  Continue the parent segment.
+  //  parentSegmentId = segmentId;
   parentSegment = openSegment(traceId, segmentId, null,
     functionName === 'routeMessage' ? 'sigfoxCallback'
   : functionName === 'decodeStructuredMessage' ? 'routeMessage'
@@ -166,7 +163,7 @@ function createRootTrace(req, traceId0) {
   console.log('createRootTrace - parentSegment:', parentSegment); //
 
   //  Create the child segment.
-  const childSegmentId = newSegmentId();
+  childSegmentId = newSegmentId();
   childSegment = openSegment(traceId, childSegmentId, segmentId, functionName);
   console.log('createRootTrace - childSegment:', childSegment, 'parent:', segmentId); //
 
@@ -273,7 +270,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   /* if (payloadObj.rootTraceId && subsegmentId && parentId) {
     payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], subsegmentId, parentId].join('|');
   } */
-  if (payloadObj.metadata && payloadObj.metadata.route && payloadObj.metadata.route.length === 0) {
+  /* if (payloadObj.metadata && payloadObj.metadata.route && payloadObj.metadata.route.length === 0) {
     const segment = {
       id: rootSegmentId,
       trace_id: rootTraceId,
@@ -289,7 +286,9 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     xray.putTraceSegments(params).promise()
       .catch(error => console.error('sendIoTMessage', error.message, error.stack));
     console.log('closeRootSegment', rootTraceId, rootSegmentId);
-  }
+  } */
+
+  if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
