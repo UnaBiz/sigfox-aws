@@ -17,6 +17,8 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
   //  Confirm that NODE_ENV is set to "production".  This is enforced in Google Cloud but not AWS.
   throw new Error('NODE_ENV must be set to "production" in AWS Lambda environment');
 }
+process.env.PACKAGE_VERSION = require('./package.json').version;
+console.log({ version: process.env.PACKAGE_VERSION });
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Utility Functions
@@ -67,13 +69,15 @@ const tracing = { startTrace: () => rootTraceStub };`;
 let rootSegmentId = null;
 let rootTraceId = null;
 
+const prefix = 'a1_';
+
 function openSegment(traceId, segmentId, name) {
   //  Open the segment.
   const newSegment = {
     // service: 'myservice',
     // version: '1.23',
     // user: 'user1',
-    name,
+    name: prefix + name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
     trace_id: traceId,
