@@ -3,7 +3,7 @@
 //  on Amazon Web Services and AWS IoT.  This module contains the framework functions
 //  used by sigfox-aws Lambda Functions.  They should also work with Linux, MacOS
 //  and Ubuntu on Windows for unit testing.
-/* eslint-disable max-len,import/no-unresolved,import/newline-after-import,arrow-body-style,camelcase */
+/* eslint-disable max-len,import/no-unresolved,import/newline-after-import,arrow-body-style,camelcase,no-nested-ternary */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Declarations - Helper constants to detect if we are running on Google Cloud or AWS.
@@ -120,7 +120,7 @@ function newSegmentId() {
   return segmentId;
 }
 
-// let rootSegment = null;
+let parentSegment = null;
 let childSegment = null;
 
 function startTrace(/* req */) {
@@ -158,6 +158,13 @@ function createRootTrace(req, traceId0) {
     rootTraceId = traceId;
     rootSegmentId = segmentId;
   }
+  //  Continue the parent segment.
+  parentSegment = openSegment(traceId, segmentId, null,
+    functionName === 'routeMessage' ? 'sigfoxCallback'
+  : functionName === 'decodeStructuredMessage' ? 'routeMessage'
+  : 'decodeStructuredMessage');
+  console.log('createRootTrace - parentSegment:', parentSegment); //
+
   //  Create the child segment.
   const childSegmentId = newSegmentId();
   childSegment = openSegment(traceId, childSegmentId, segmentId, functionName);
@@ -562,11 +569,16 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  if (childSegment) {
+  if (parentSegment) {
+    console.log('Close parentSegment', parentSegment);
+    closeSegment(parentSegment);
+    parentSegment = null;
+  }
+  /* if (childSegment) {
     console.log('Close childSegment', childSegment);
     closeSegment(childSegment);
     childSegment = null;
-  }
+  } */
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
   /* if (segment1) {
     // console.log('Close segment1', segment1);
