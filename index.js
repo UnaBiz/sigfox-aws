@@ -92,9 +92,9 @@ function openSegment(traceId, segmentId, name) {
 
 function closeSegment(segment) {
   //  Close the segment.
-  // eslint-disable-next-line no-param-reassign
+  //  eslint-disable-next-line no-param-reassign
   segment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
-  if (segment.in_progress) segment.in_progress = false;
+  if (segment.in_progress) delete segment.in_progress;
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(segment),
@@ -106,13 +106,16 @@ function closeSegment(segment) {
 }
 
 function newSegmentId() {
+  //  Return a new segment ID to identify the segment of running code trace.
+  //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
+  //  and convert to hex.
   const trace_id_time = Math.floor(Date.now() / 1000).toString(16);
   let segmentId = (`0000000000000000${trace_id_time}`);
   segmentId = segmentId.substr(segmentId.length - 16);  //  16-digits
   return segmentId;
 }
 
-let rootSegment = null;
+// let rootSegment = null;
 let childSegment = null;
 
 function startTrace(/* req */) {
@@ -121,9 +124,9 @@ function startTrace(/* req */) {
   const segment = AWSXRay.getSegment();
   const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
   const segmentId = newSegmentId();
-  rootSegment = openSegment(traceId, segmentId, 'overall');
+  // rootSegment = openSegment(traceId, segmentId, 'overall');
   console.log('startTrace', segment); //
-  console.log('startTrace - rootSegment', rootSegment); //
+  // console.log('startTrace - rootSegment', rootSegment); //
 
   //  Create the child segment.
   const childSegmentId = newSegmentId();
