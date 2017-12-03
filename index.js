@@ -69,9 +69,9 @@ const tracing = { startTrace: () => rootTraceStub };`;
 let rootSegmentId = null;
 let rootTraceId = null;
 
-const prefix = 'a1_';
+const prefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join(''); //
 
-function openSegment(traceId, segmentId, name) {
+function openSegment(traceId, segmentId, parentSegmentId, name) {
   //  Open the segment.
   const newSegment = {
     // service: 'myservice',
@@ -83,6 +83,7 @@ function openSegment(traceId, segmentId, name) {
     trace_id: traceId,
     in_progress: true,
   };
+  if (parentSegmentId) newSegment.parent_id = parentSegmentId;
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(newSegment),
@@ -134,8 +135,8 @@ function startTrace(/* req */) {
 
   //  Create the child segment.
   const childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId, functionName);
-  console.log('startTrace - childSegment', childSegment); //
+  childSegment = openSegment(traceId, childSegmentId, segment.segment_id, functionName);
+  console.log('startTrace - childSegment:', childSegment, 'parent:', segment.segment_id); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, segmentId].join('|'),
@@ -159,8 +160,8 @@ function createRootTrace(req, traceId0) {
   }
   //  Create the child segment.
   const childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId, functionName);
-  console.log('createRootTrace - childSegment', childSegment); //
+  childSegment = openSegment(traceId, childSegmentId, segmentId, functionName);
+  console.log('createRootTrace - childSegment:', childSegment, 'parent:', segmentId); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, segmentId].join('|'),
