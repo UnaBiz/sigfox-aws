@@ -128,7 +128,7 @@ function startTrace(/* req */) {
   //  Create the root segment.
   const segment = AWSXRay.getSegment();
   const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
-  const segmentId = newSegmentId();
+  // const segmentId = newSegmentId();
   // rootSegment = openSegment(traceId, segmentId, 'overall');
   console.log('startTrace', segment); //
   // console.log('startTrace - rootSegment', rootSegment); //
@@ -139,7 +139,7 @@ function startTrace(/* req */) {
   console.log('startTrace - childSegment:', childSegment, 'parent:', segment.id); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-    traceId: [traceId, segmentId].join('|'),
+    traceId: [traceId, childSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
     end: () => ({}),
   };
@@ -164,7 +164,7 @@ function createRootTrace(req, traceId0) {
   console.log('createRootTrace - childSegment:', childSegment, 'parent:', segmentId); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-    traceId: [traceId, segmentId].join('|'),
+    traceId: [traceId, childSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
     end: () => ({}),
   };
