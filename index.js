@@ -136,6 +136,14 @@ function closeSegment(segment) {
   sendSegment(segment);
 }
 
+function newTraceId() {
+  const trace_id_time = Math.floor(Date.now() / 1000).toString(16);
+  // testSegment.id = (`0000000000000000${trace_id_time}`);
+  // testSegment.id = testSegment.id.substr(testSegment.id.length - 16);  //  16-digits
+  const trace_id = `1-${trace_id_time}-123456789012345678901234`;  //  8 then 24 hex digits
+  return trace_id;
+}
+
 function newSegmentId() {
   //  Return a new segment ID to identify the segment of running code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
@@ -149,10 +157,13 @@ function newSegmentId() {
 function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  Create the root segment.
-  const segment = AWSXRay.getSegment();
+  /* const segment = AWSXRay.getSegment();
   traceId = (segment && segment.trace_id) ? segment.trace_id : null;
-  childSegmentId = segment.id;
-  console.log('startTrace', segment); //
+  childSegmentId = segment.id; */
+  // console.log('startTrace', segment); //
+
+  traceId = newTraceId();
+  childSegmentId = newSegmentId();
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, childSegmentId].join('|'),
