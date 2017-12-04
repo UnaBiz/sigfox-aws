@@ -84,11 +84,11 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 
 const tracing = { startTrace: () => rootTraceStub };`;
 
-/* let parentSegmentId = null;
-let childSegmentId = null;
+let parentSegmentId = null;
+// let childSegmentId = null;
 let parentSegment = null;
-let childSegment = null;
-let traceId = null; */
+// let childSegment = null;
+let traceId = null;
 
 const prefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join(''); //
 
@@ -144,14 +144,9 @@ function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  Create the root segment.
   const segment = AWSXRay.getSegment();
-  const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
+  traceId = (segment && segment.trace_id) ? segment.trace_id : null;
   const segmentId = segment.id;
   console.log('startTrace', segment); //
-
-  //  Create the child segment.
-  /* childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId, segment.id, functionName);
-  console.log('startTrace - childSegment:', childSegment, 'parent:', segment.id); */
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, segmentId].join('|'),
@@ -164,12 +159,12 @@ function startTrace(/* req */) {
 
 function createRootTrace(req, traceId0, traceSegment0) {
   //  Return the root trace for instrumentation.  Called by non-sigfoxCallback to continue a trace.
-  /* if (traceSegment0) {
+  if (traceSegment0) {
     parentSegment = JSON.parse(JSON.stringify(traceSegment0));
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
   }
-  console.log('createRootTrace - parentSegment:', parentSegment); */
+  console.log('createRootTrace - parentSegment:', parentSegment);
 
   //  Create the child segment.
   /* childSegmentId = newSegmentId();
@@ -177,17 +172,17 @@ function createRootTrace(req, traceId0, traceSegment0) {
   console.log('createRootTrace - childSegment:', childSegment); */
 
   //  Get trace ID and segment ID.
-  const segment = AWSXRay.getSegment();
-  const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
-  const segmentId = segment.id;
+  /* const segment = AWSXRay.getSegment();
+  traceId = (segment && segment.trace_id) ? segment.trace_id : null;
+  const segmentId = segment.id; */
 
   //  Create a subsegment and set it as the active segment.
-  const subsegment = segment.addNewSubsegment(`z${prefix}${functionName}`);
+  /* const subsegment = segment.addNewSubsegment(`z${prefix}${functionName}`);
   AWSXRay.setSegment(subsegment);
-  console.log('createRootTrace', 'segment', segment, 'subsegment', subsegment);
+  console.log('createRootTrace', 'segment', segment, 'subsegment', subsegment); */
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-    traceId: [traceId, segmentId].join('|'),
+    traceId: [traceId, parentSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
     end: () => ({}),
   };
@@ -288,8 +283,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const topic = (topic0 || '').split('.').join('/');
   const payloadObj = JSON.parse(payload0);
   //  TODO: Obsolete.
-  // if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
-  /* if (traceId && childSegmentId) {
+  if (traceId && parentSegmentId) payloadObj.rootTraceId = [traceId, parentSegmentId].join('|');
+  if (traceId && parentSegmentId) {
     //  Create a new segment with annotations to AWS but remove them from the payload.
     const segmentId = newSegmentId();
     const annotations = {};
@@ -301,22 +296,14 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       if (typeof val === 'object') continue;
       annotations[key] = val;
     }
-    const segment = openSegment(traceId, segmentId, childSegmentId, topic, annotations);
-    if (segment.annotations) delete segment.annotations;
-    payloadObj.traceSegment = JSON.parse(JSON.stringify(segment));
-  } */
-  {
-    const segment = AWSXRay.getSegment();
-    payloadObj.rootTraceId = [segment.trace_id || segment.segment.trace_id, segment.id].join('|');
-    console.log('sendIoTMessage', segment);
-
-    //  Create subsegment.
-    // const name = topic.split('/').join('_');
-    // const subsegment = segment.addNewSubsegment(name);
-    // payloadObj.rootTraceId = [subsegment.segment.trace_id, subsegment.id].join('|');
-    // payloadObj.traceSegment = subsegment.toJSON();
-    // console.log('sendIoTMessage', subsegment);
+    const segment = openSegment(traceId, segmentId, parentSegmentId, topic, annotations);
+    const segmentWithoutAnnotations = Object.assign({}, segment);
+    if (segmentWithoutAnnotations.annotations) delete segmentWithoutAnnotations.annotations;
+    payloadObj.traceSegment = JSON.parse(JSON.stringify(segmentWithoutAnnotations));
   }
+  /* const subsegment = new AWSXRay.Subsegment(topic.split('/').join('_'));
+  console.log('sendIoTMessage', subsegment); */
+
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
@@ -528,16 +515,16 @@ function init(event, context, callback, task) {
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
 
-  if (event && event.rootTraceId) {
+  /* if (event && event.rootTraceId) {
     //  Set the environment for AWS Xray tracing.
     //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
     const splitId = event.rootTraceId.split('|');
-    const traceId = splitId[0];
-    const parentSegmentId = splitId[1];
+    traceId = splitId[0];
+    parentSegmentId = splitId[1];
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
-  }
-  /* if (event && event.traceSegment) {
+  } */
+  if (event && event.traceSegment) {
     //  Set the environment for AWS Xray tracing.
     //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
     parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
@@ -545,7 +532,7 @@ function init(event, context, callback, task) {
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
-  } */
+  }
 
   //  Allow AWS X-Ray to capture trace.
   // eslint-disable-next-line import/no-unresolved,global-require,no-unused-vars
