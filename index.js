@@ -124,7 +124,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name, annotations) {
     in_progress: true,
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
-  Object.assign(newSegment, { annotations });
+  if (annotations) newSegment.annotations = annotations;
   sendSegment(newSegment);
   return newSegment;
 }
