@@ -72,6 +72,18 @@ let traceId = null;
 
 const prefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join(''); //
 
+function sendSegment(segment) {
+  //  Send the segment to AWS.
+  const params = {
+    TraceSegmentDocuments: [
+      JSON.stringify(segment),
+    ],
+  };
+  const xray = new AWS.XRay();
+  xray.putTraceSegments(params).promise()
+    .catch(error => console.error('sendSegment', segment, error.message, error.stack));
+}
+
 function openSegment(traceId0, segmentId, parentSegmentId0, name) {
   //  Open the segment.
   const newSegment = {
@@ -85,14 +97,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name) {
     in_progress: true,
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
-  const params = {
-    TraceSegmentDocuments: [
-      JSON.stringify(newSegment),
-    ],
-  };
-  const xray = new AWS.XRay();
-  xray.putTraceSegments(params).promise()
-    .catch(error => console.error('openSegment', error.message, error.stack));
+  sendSegment(newSegment);
   return newSegment;
 }
 
@@ -101,14 +106,7 @@ function closeSegment(segment) {
   //  eslint-disable-next-line no-param-reassign
   segment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
   if (segment.in_progress) delete segment.in_progress;
-  const params = {
-    TraceSegmentDocuments: [
-      JSON.stringify(segment),
-    ],
-  };
-  const xray = new AWS.XRay();
-  xray.putTraceSegments(params).promise()
-    .catch(error => console.error('closeSegment', error.message, error.stack));
+  sendSegment(segment);
 }
 
 function newSegmentId() {
@@ -273,7 +271,20 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  to AWS MQTT format like sigfox/devices/all.
   const payloadObj = JSON.parse(payload0);
   if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
-  if (childSegment) payloadObj.traceSegment = JSON.parse(JSON.stringify(childSegment));
+  if (childSegment) {
+    const body = payloadObj.body || {};
+    childSegment.annotations = {};
+    const annotations = childSegment.annotations;
+    for (const key of Object.keys(body)) {
+      //  Log only scalar values.
+      const val = body[key];
+      if (val === null || val === undefined) continue;
+      if (typeof val === 'object') continue;
+      annotations[key] = val;
+    }
+    sendSegment(childSegment);
+    payloadObj.traceSegment = JSON.parse(JSON.stringify(childSegment));
+  }
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
