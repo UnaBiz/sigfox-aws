@@ -454,6 +454,8 @@ function updateDeviceState(req, device0, state) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Startup
 
+//  _X_AMZN_TRACE_ID: 'Root=1-5a24e83e-5c8e480526dbe3335dd935d7;Parent=405dfe6a11008111;Sampled=1',
+
 function prepareRequest(event /* context */) {
   //  Prepare the request object and return it.
   const body = (typeof event.body === 'string')
