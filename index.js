@@ -193,11 +193,11 @@ function createRootTrace(req, traceId0, traceSegment0) {
   console.log('createRootTrace - childSegment:', childSegment); //
 
   //  Close the parent segment after creating the child segment.
-  if (parentSegment) {
+  /* if (parentSegment) {
     console.log('Close parentSegment', parentSegment);
     closeSegment(parentSegment);
     parentSegment = null;
-  }
+  } */
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, childSegmentId].join('|'),
@@ -318,6 +318,10 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     if (segment.annotations) delete segment.annotations;
     payloadObj.traceSegment = JSON.parse(JSON.stringify(segment));
   }
+  //  Create subsegment.
+  const subsegment = new AWSXRay.Subsegment(topic.split('/').join('_'));
+  console.log('sendIoTMessage', subsegment);
+
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
