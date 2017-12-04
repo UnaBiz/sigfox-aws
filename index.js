@@ -68,9 +68,10 @@ AWSXRay.setAWSWhitelist({
 }); */
 
 //  Create the AWS SDK instance.
-const AWS = isProduction
+const AWS = require('aws-sdk');
+/* const AWS = isProduction
   ? AWSXRay.captureAWS(require('aws-sdk'))
-  : require('aws-sdk');
+  : require('aws-sdk'); */
 if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
 else AWS.config.loadFromPath('./aws-credentials.json');
 
