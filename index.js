@@ -19,7 +19,7 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
 }
 process.env.AWS_XRAY_DEBUG_MODE = 'TRUE';
 process.env.PACKAGE_VERSION = require('./package.json').version;
-console.log({ version: process.env.PACKAGE_VERSION });
+console.log({ gcloud_aws_version: process.env.PACKAGE_VERSION });
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Utility Functions
