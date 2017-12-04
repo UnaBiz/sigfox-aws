@@ -272,9 +272,10 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const payloadObj = JSON.parse(payload0);
   if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
   if (childSegment) {
+    //  Send annotations to AWS but remove them from the payload.
+    payloadObj.traceSegment = JSON.parse(JSON.stringify(childSegment));
+    const annotations = {};
     const body = payloadObj.body || {};
-    childSegment.annotations = {};
-    const annotations = childSegment.annotations;
     for (const key of Object.keys(body)) {
       //  Log only scalar values.
       const val = body[key];
@@ -282,8 +283,9 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       if (typeof val === 'object') continue;
       annotations[key] = val;
     }
-    sendSegment(childSegment);
-    payloadObj.traceSegment = JSON.parse(JSON.stringify(childSegment));
+    const segment = JSON.parse(JSON.stringify(childSegment));
+    segment.annotations = annotations;
+    sendSegment(segment);
   }
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
