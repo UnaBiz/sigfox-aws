@@ -462,8 +462,6 @@ function updateDeviceState(req, device0, state) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Startup
 
-//  _X_AMZN_TRACE_ID: 'Root=1-5a24e83e-5c8e480526dbe3335dd935d7;Parent=405dfe6a11008111;Sampled=1',
-
 function prepareRequest(event /* context */) {
   //  Prepare the request object and return it.
   const body = (typeof event.body === 'string')
@@ -508,10 +506,10 @@ function init(event, context, callback, task) {
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
 
-  if (event.body && event.body.traceSegment) {
+  if (event && event.traceSegment) {
     //  Set the environment for AWS Xray tracing.
     //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
-    parentSegment = JSON.parse(JSON.stringify(event.body.traceSegment));
+    parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
