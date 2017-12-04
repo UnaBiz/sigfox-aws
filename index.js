@@ -145,11 +145,11 @@ function startTrace(/* req */) {
   //  Create the root segment.
   const segment = AWSXRay.getSegment();
   traceId = (segment && segment.trace_id) ? segment.trace_id : null;
-  parentSegmentId = segment.id;
+  childSegmentId = segment.id;
   console.log('startTrace', segment); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-    traceId: [traceId, parentSegmentId].join('|'),
+    traceId: [traceId, childSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
     end: () => ({}),
   };
