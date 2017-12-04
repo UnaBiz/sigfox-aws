@@ -42,6 +42,26 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
+AWSXRay.appendAWSWhitelist({
+  services: {
+    xray: {
+      operations: {
+        putTraceSegments: {},
+      },
+    },
+    iot: {
+      operations: {
+        describeEndpoint: {},
+      },
+    },
+    iotdata: {
+      operations: {
+        publish: {},
+      },
+    },
+  },
+});
+
 //  Create the AWS SDK instance.
 const AWS = isProduction
   ? AWSXRay.captureAWS(require('aws-sdk'))
