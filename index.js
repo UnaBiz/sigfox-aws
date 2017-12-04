@@ -84,7 +84,7 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name) {
+function openSegment(traceId0, segmentId, parentSegmentId0, name, annotations) {
   //  Open the segment.
   const newSegment = {
     // service: 'myservice',
@@ -97,6 +97,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name) {
     in_progress: true,
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
+  Object.assign(newSegment, { annotations });
   sendSegment(newSegment);
   return newSegment;
 }
@@ -269,11 +270,13 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  Send the text message to the AWS IoT MQTT queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
+  const topic = (topic0 || '').split('.').join('/');
   const payloadObj = JSON.parse(payload0);
+  //  TODO: Obsolete.
   if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
-  if (childSegment) {
-    //  Send annotations to AWS but remove them from the payload.
-    payloadObj.traceSegment = JSON.parse(JSON.stringify(childSegment));
+  if (traceId && childSegmentId) {
+    //  Create a new segment with annotations to AWS but remove them from the payload.
+    const segmentId = newSegmentId();
     const annotations = {};
     const body = payloadObj.body || {};
     for (const key of Object.keys(body)) {
@@ -283,12 +286,11 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       if (typeof val === 'object') continue;
       annotations[key] = val;
     }
-    const segment = JSON.parse(JSON.stringify(childSegment));
-    segment.annotations = annotations;
-    sendSegment(segment);
+    const segment = openSegment(traceId, segmentId, childSegmentId, topic, annotations);
+    if (segment.annotations) delete segment.annotations;
+    payloadObj.traceSegment = JSON.parse(JSON.stringify(segment));
   }
   const payload = JSON.stringify(payloadObj);
-  const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
   return getIoTData(req)
@@ -561,11 +563,11 @@ function shutdown(req, useCallback, error, result) {
     closeSegment(parentSegment);
     parentSegment = null;
   }
-  /* if (childSegment) {
+  if (childSegment) {
     console.log('Close childSegment', childSegment);
     closeSegment(childSegment);
     childSegment = null;
-  } */
+  }
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
   /* AWS = null; //
   AWSXRay = null; //
