@@ -176,9 +176,15 @@ function createRootTrace(req, traceId0, traceSegment0) {
   childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName);
   console.log('createRootTrace - childSegment:', childSegment); */
 
+  //  Get trace ID and segment ID.
   const segment = AWSXRay.getSegment();
   const traceId = (segment && segment.trace_id) ? segment.trace_id : null;
   const segmentId = segment.id;
+
+  //  Create a subsegment and set it as the active segment.
+  const subsegment = segment.addNewSubsegment(`z${prefix}${functionName}`);
+  AWSXRay.setSegment(subsegment);
+  console.log('createRootTrace', 'segment', segment, 'subsegment', subsegment);
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, segmentId].join('|'),
@@ -300,12 +306,16 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     payloadObj.traceSegment = JSON.parse(JSON.stringify(segment));
   } */
   {
-    //  Create subsegment.
-    const name = topic.split('/').join('_');
     const segment = AWSXRay.getSegment();
-    const subsegment = segment.addNewSubsegment(name);
-    payloadObj.rootTraceId = [subsegment.segment.trace_id, subsegment.id].join('|');
-    console.log('sendIoTMessage', subsegment);
+    payloadObj.rootTraceId = [segment.trace_id || segment.segment.trace_id, segment.id].join('|');
+    console.log('sendIoTMessage', segment);
+
+    //  Create subsegment.
+    // const name = topic.split('/').join('_');
+    // const subsegment = segment.addNewSubsegment(name);
+    // payloadObj.rootTraceId = [subsegment.segment.trace_id, subsegment.id].join('|');
+    // payloadObj.traceSegment = subsegment.toJSON();
+    // console.log('sendIoTMessage', subsegment);
   }
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
