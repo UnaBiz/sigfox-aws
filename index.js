@@ -64,7 +64,7 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 
 const tracing = { startTrace: () => rootTraceStub };`;
 
-// let parentSegmentId = null;
+let parentSegmentId = null;
 let childSegmentId = null;
 let parentSegment = null;
 let childSegment = null;
@@ -145,9 +145,14 @@ function startTrace(/* req */) {
   return tracing.startTrace();
 }
 
-function createRootTrace(req, traceId0) {
+function createRootTrace(req, traceId0, traceSegment0) {
   //  Return the root trace for instrumentation.  Called by non-sigfoxCallback to continue a trace.
-  traceId = traceId0;
+  if (traceSegment0) {
+    parentSegment = JSON.parse(JSON.stringify(traceSegment0));
+    traceId = childSegment.trace_id;
+    parentSegmentId = parentSegment.id;
+  }
+  /* traceId = traceId0;
   let segmentId = null;
   if (traceId0 && traceId0.split('|').length >= 2) {
     //  traceId|segmentId
@@ -159,13 +164,13 @@ function createRootTrace(req, traceId0) {
   parentSegment = openSegment(traceId, segmentId, null,
     functionName === 'routeMessage' ? 'sigfoxCallback'
   : functionName === 'decodeStructuredMessage' ? 'routeMessage'
-  : 'decodeStructuredMessage');
+  : 'decodeStructuredMessage'); */
   console.log('createRootTrace - parentSegment:', parentSegment); //
 
   //  Create the child segment.
   childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId, segmentId, functionName);
-  console.log('createRootTrace - childSegment:', childSegment, 'parent:', segmentId); //
+  childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName);
+  console.log('createRootTrace - childSegment:', childSegment); //
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, childSegmentId].join('|'),
@@ -267,28 +272,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const payloadObj = JSON.parse(payload0);
-  /* if (payloadObj.rootTraceId && subsegmentId && parentId) {
-    payloadObj.rootTraceId = [payloadObj.rootTraceId.split('|')[0], subsegmentId, parentId].join('|');
-  } */
-  /* if (payloadObj.metadata && payloadObj.metadata.route && payloadObj.metadata.route.length === 0) {
-    const segment = {
-      id: rootSegmentId,
-      trace_id: rootTraceId,
-      end_time: Date.now() / 1000.0,
-      in_progress: false,
-    };
-    const params = {
-      TraceSegmentDocuments: [
-        JSON.stringify(segment),
-      ],
-    };
-    const xray = new AWS.XRay();
-    xray.putTraceSegments(params).promise()
-      .catch(error => console.error('sendIoTMessage', error.message, error.stack));
-    console.log('closeRootSegment', rootTraceId, rootSegmentId);
-  } */
-
   if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
+  if (childSegment) payloadObj.traceSegment = JSON.parse(JSON.stringify(childSegment));
   const payload = JSON.stringify(payloadObj);
   const topic = (topic0 || '').split('.').join('/');
   const params = { topic, payload, qos: 0 };
@@ -331,21 +316,11 @@ function getQueue(req, projectId0, topicName) {
     publisher: () => ({
       publish: (buffer) => {
         let subsegment = null;
-        /* let subsegmentId = null;
-        let parent = null;
-        let parentId = null; */
         return new Promise((resolve) => {
           //  Publish the message body as an AWS X-Ray annotation.
           //  This allows us to trace the message processing through AWS X-Ray.
           AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
             subsegment = subsegment0;
-            /* parent = subsegment.segment;
-            parentId = parent ? parent.id : null;
-            subsegmentId = subsegment ? subsegment.id : null;
-            console.log('subsegment', subsegment);
-            console.log('parent', parent);
-            console.log('subsegmentId', subsegmentId); //
-            console.log('parentId', parentId); // */
             try {
               const msg = JSON.parse(buffer.toString());
               const body = msg.body || msg;
@@ -579,16 +554,6 @@ function shutdown(req, useCallback, error, result) {
     childSegment = null;
   } */
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
-  /* if (segment1) {
-    // console.log('Close segment1', segment1);
-    // segment1.close();
-    segment1 = null;
-  }
-  if (segment2) {
-    // console.log('Close segment2', segment2);
-    // segment2.close();
-    segment2 = null;
-  } */
   /* AWS = null; //
   AWSXRay = null; //
   Iot = null; //
