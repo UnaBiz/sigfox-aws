@@ -147,7 +147,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
   //  Return the root trace for instrumentation.  Called by non-sigfoxCallback to continue a trace.
   if (traceSegment0) {
     parentSegment = JSON.parse(JSON.stringify(traceSegment0));
-    traceId = childSegment.trace_id;
+    traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
   }
   /* traceId = traceId0;
