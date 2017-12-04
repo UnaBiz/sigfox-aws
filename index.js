@@ -3,7 +3,7 @@
 //  on Amazon Web Services and AWS IoT.  This module contains the framework functions
 //  used by sigfox-aws Lambda Functions.  They should also work with Linux, MacOS
 //  and Ubuntu on Windows for unit testing.
-/* eslint-disable max-len,import/no-unresolved,import/newline-after-import,arrow-body-style,camelcase,no-nested-ternary */
+/* eslint-disable max-len,import/no-unresolved,import/newline-after-import,arrow-body-style,camelcase,no-nested-ternary,no-underscore-dangle */
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Declarations - Helper constants to detect if we are running on Google Cloud or AWS.
@@ -17,6 +17,7 @@ if (process.env.AWS_EXECUTION_ENV && process.env.AWS_EXECUTION_ENV.indexOf('AWS_
   //  Confirm that NODE_ENV is set to "production".  This is enforced in Google Cloud but not AWS.
   throw new Error('NODE_ENV must be set to "production" in AWS Lambda environment');
 }
+process.env.AWS_XRAY_DEBUG_MODE = 'TRUE';
 process.env.PACKAGE_VERSION = require('./package.json').version;
 console.log({ version: process.env.PACKAGE_VERSION });
 
@@ -170,6 +171,13 @@ function createRootTrace(req, traceId0, traceSegment0) {
   childSegmentId = newSegmentId();
   childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName);
   console.log('createRootTrace - childSegment:', childSegment); //
+
+  //  Close the parent segment after creating the child segment.
+  if (parentSegment) {
+    console.log('Close parentSegment', parentSegment);
+    closeSegment(parentSegment);
+    parentSegment = null;
+  }
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, childSegmentId].join('|'),
@@ -499,6 +507,16 @@ function init(event, context, callback, task) {
   //  Call the callback upon success or failure.
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
+
+  if (event.body && event.body.traceSegment) {
+    //  Set the environment for AWS Xray tracing.
+    //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
+    parentSegment = JSON.parse(JSON.stringify(event.body.traceSegment));
+    traceId = parentSegment.trace_id;
+    parentSegmentId = parentSegment.id;
+    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+    console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
+  }
   //  Allow AWS X-Ray to capture trace.
   // eslint-disable-next-line import/no-unresolved,global-require,no-unused-vars
   const NOTUSED3 = `AWSXRay = require('aws-xray-sdk-core');
