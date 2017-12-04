@@ -40,7 +40,10 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
-AWSXRay.setAWSWhitelist({});
+AWSXRay.setAWSWhitelist({
+  services: {
+  },
+});
 
 //  Extend the AWS whitelist to allow these functions to log.
 /* AWSXRay.appendAWSWhitelist({
