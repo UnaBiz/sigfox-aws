@@ -198,7 +198,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id; */
 
-    traceId = traceSegment0.trace_id || traceSegment0.segment.trace_id;
+    traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
     parentSegment = new AWSXRay.Segment(traceSegment0.name, traceId, parentSegmentId);
     // AWSXRay.setSegment(parentSegment);
@@ -333,7 +333,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
 
   if (childSegment) {
     const segment = childSegment.addNewSubsegment(prefix + topic.split('/').join('_'));
-    payloadObj.traceSegment = segment.toJSON();
+    payloadObj.traceSegment = Object.assign({}, segment.toJSON(), { trace_id: traceId });
     //  TODO: Obsolete.
     payloadObj.rootTraceId = [traceId, segment.id].join('|');
     console.log('sendIoTMessage - segment:', segment);
