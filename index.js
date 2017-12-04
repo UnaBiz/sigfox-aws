@@ -164,6 +164,8 @@ function startTrace(/* req */) {
 
   traceId = newTraceId();
   childSegmentId = newSegmentId();
+  const segment = openSegment(traceId, childSegmentId, null, prefix + functionName, null);
+  console.log('startTrace', segment);
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, childSegmentId].join('|'),
