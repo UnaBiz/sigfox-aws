@@ -85,9 +85,9 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 const tracing = { startTrace: () => rootTraceStub };`;
 
 let parentSegmentId = null;
-// let childSegmentId = null;
+let childSegmentId = null;
 let parentSegment = null;
-// let childSegment = null;
+let childSegment = null;
 let traceId = null;
 
 const prefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join(''); //
@@ -158,7 +158,8 @@ function startTrace(/* req */) {
 }
 
 function createRootTrace(req, traceId0, traceSegment0) {
-  //  Return the root trace for instrumentation.  Called by non-sigfoxCallback to continue a trace.
+  //  Return the root trace for instrumentation.  Called by
+  //  non-sigfoxCallback (e.g. routeMessage) to continue a trace.
   if (traceSegment0) {
     parentSegment = JSON.parse(JSON.stringify(traceSegment0));
     traceId = parentSegment.trace_id;
@@ -167,9 +168,18 @@ function createRootTrace(req, traceId0, traceSegment0) {
   console.log('createRootTrace - parentSegment:', parentSegment);
 
   //  Create the child segment.
-  /* childSegmentId = newSegmentId();
-  childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName);
-  console.log('createRootTrace - childSegment:', childSegment); */
+  if (parentSegmentId) {
+    childSegmentId = newSegmentId();
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName);
+    console.log('createRootTrace - childSegment:', childSegment);
+  }
+
+  //  Close the parent segment.
+  if (parentSegment) {
+    console.log('Close parentSegment', parentSegment);
+    closeSegment(parentSegment);
+    parentSegment = null;
+  }
 
   //  Get trace ID and segment ID.
   /* const segment = AWSXRay.getSegment();
@@ -188,7 +198,6 @@ function createRootTrace(req, traceId0, traceSegment0) {
   };
   return rootTraceStub;
 }
-
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Logging Functions: Log to AWS CloudWatch
@@ -283,8 +292,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const topic = (topic0 || '').split('.').join('/');
   const payloadObj = JSON.parse(payload0);
   //  TODO: Obsolete.
-  if (traceId && parentSegmentId) payloadObj.rootTraceId = [traceId, parentSegmentId].join('|');
-  if (traceId && parentSegmentId) {
+  if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
+  if (traceId && childSegmentId) {
     //  Create a new segment with annotations to AWS but remove them from the payload.
     const segmentId = newSegmentId();
     const annotations = {};
@@ -296,10 +305,11 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       if (typeof val === 'object') continue;
       annotations[key] = val;
     }
-    const segment = openSegment(traceId, segmentId, parentSegmentId, topic, annotations);
+    const segment = openSegment(traceId, segmentId, childSegmentId, `sendto_${topic}`, annotations);
     const segmentWithoutAnnotations = Object.assign({}, segment);
     if (segmentWithoutAnnotations.annotations) delete segmentWithoutAnnotations.annotations;
     payloadObj.traceSegment = JSON.parse(JSON.stringify(segmentWithoutAnnotations));
+    console.log('sendIoTMessage', segment);
   }
   /* const subsegment = new AWSXRay.Subsegment(topic.split('/').join('_'));
   console.log('sendIoTMessage', subsegment); */
@@ -595,7 +605,7 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  /* if (parentSegment) {
+  if (parentSegment) {
     console.log('Close parentSegment', parentSegment);
     closeSegment(parentSegment);
     parentSegment = null;
@@ -604,7 +614,7 @@ function shutdown(req, useCallback, error, result) {
     console.log('Close childSegment', childSegment);
     closeSegment(childSegment);
     childSegment = null;
-  } */
+  }
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
   /* AWS = null; //
   AWSXRay = null; //
