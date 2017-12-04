@@ -40,8 +40,10 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
+AWSXRay.setAWSWhitelist({});
+
 //  Extend the AWS whitelist to allow these functions to log.
-AWSXRay.appendAWSWhitelist({
+/* AWSXRay.appendAWSWhitelist({
   services: {
     xray: {
       operations: {
@@ -59,7 +61,7 @@ AWSXRay.appendAWSWhitelist({
       },
     },
   },
-});
+}); */
 
 //  Create the AWS SDK instance.
 const AWS = isProduction
