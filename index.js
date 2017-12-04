@@ -92,7 +92,7 @@ const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTrace
 const tracing = { startTrace: () => rootTraceStub };`;
 
 let parentSegmentId = null;
-let childSegmentId = null;
+// let childSegmentId = null;
 let parentSegment = null;
 let childSegment = null;
 let traceId = null;
@@ -163,13 +163,26 @@ function startTrace(/* req */) {
   childSegmentId = segment.id; */
   // console.log('startTrace', segment); //
 
-  traceId = newTraceId();
+  /* traceId = newTraceId();
   childSegmentId = newSegmentId();
-  const segment = openSegment(traceId, childSegmentId, null, prefix + functionName, null);
-  console.log('startTrace', segment);
+  const segment = openSegment(traceId, childSegmentId, null, prefix + functionName, null); */
+
+  parentSegment = new AWSXRay.Segment(prefix + functionName);
+  AWSXRay.setSegment(parentSegment);
+  traceId = parentSegment.trace_id;
+  parentSegmentId = parentSegment.id;
+  console.log('startTrace - parentSegment', parentSegment);
+
+  //  Create the child segment.
+  if (parentSegment) {
+    /* childSegmentId = newSegmentId();
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName); */
+    childSegment = parentSegment.addNewSubsegment(prefix + functionName);
+    console.log('startTrace - childSegment:', childSegment);
+  }
 
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-    traceId: [traceId, childSegmentId].join('|'),
+    traceId: [traceId, parentSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
     end: () => ({}),
   };
@@ -181,25 +194,31 @@ function createRootTrace(req, traceId0, traceSegment0) {
   //  Return the root trace for instrumentation.  Called by
   //  non-sigfoxCallback (e.g. routeMessage) to continue a trace.
   if (traceSegment0) {
-    parentSegment = JSON.parse(JSON.stringify(traceSegment0));
+    /* parentSegment = JSON.parse(JSON.stringify(traceSegment0));
     traceId = parentSegment.trace_id;
-    parentSegmentId = parentSegment.id;
+    parentSegmentId = parentSegment.id; */
+
+    traceId = traceSegment0.trace_id || traceSegment0.segment.trace_id;
+    parentSegmentId = traceSegment0.id;
+    parentSegment = new AWSXRay.Segment(traceSegment0.name, traceId, parentSegmentId);
+    AWSXRay.setSegment(parentSegment);
+    console.log('createRootTrace - parentSegment:', parentSegment);
   }
-  console.log('createRootTrace - parentSegment:', parentSegment);
 
   //  Create the child segment.
-  if (parentSegmentId) {
-    childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName);
+  if (parentSegment) {
+    /* childSegmentId = newSegmentId();
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName); */
+    childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     console.log('createRootTrace - childSegment:', childSegment);
   }
 
   //  Close the parent segment.
-  if (parentSegment) {
+  /* if (parentSegment) {
     console.log('Close parentSegment', parentSegment);
     closeSegment(parentSegment);
     parentSegment = null;
-  }
+  } */
 
   //  Get trace ID and segment ID.
   /* const segment = AWSXRay.getSegment();
@@ -311,9 +330,20 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  to AWS MQTT format like sigfox/devices/all.
   const topic = (topic0 || '').split('.').join('/');
   const payloadObj = JSON.parse(payload0);
+
+  if (childSegment) {
+    const segment = childSegment.addNewSubsegment(prefix + topic.split('/').join('_'));
+    payloadObj.traceSegment = segment.toJSON();
+    //  TODO: Obsolete.
+    payloadObj.rootTraceId = [traceId, segment.id].join('|');
+    console.log('sendIoTMessage - segment:', segment);
+  }
+
   //  TODO: Obsolete.
-  if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
-  if (traceId && childSegmentId) {
+  //  if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
+
+  // eslint-disable-next-line no-unused-vars
+  const NOTUSED3 = `if (traceId && childSegmentId) {
     //  Create a new segment with annotations to AWS but remove them from the payload.
     const segmentId = newSegmentId();
     const annotations = null;
@@ -326,12 +356,12 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       if (typeof val === 'object') continue;
       annotations[key] = val;
     } */
-    const segment = openSegment(traceId, segmentId, childSegmentId, `sendto_${topic}`, annotations);
+    const segment = openSegment(traceId, segmentId, childSegmentId, 'sendto_${topic}', annotations);
     const segmentWithoutAnnotations = Object.assign({}, segment);
     if (segmentWithoutAnnotations.annotations) delete segmentWithoutAnnotations.annotations;
     payloadObj.traceSegment = JSON.parse(JSON.stringify(segmentWithoutAnnotations));
     console.log('sendIoTMessage', segment);
-  }
+  }`;
   /* const subsegment = new AWSXRay.Subsegment(topic.split('/').join('_'));
   console.log('sendIoTMessage', subsegment); */
 
@@ -626,14 +656,15 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  if (parentSegment) {
+  /* if (parentSegment) {
     console.log('Close parentSegment', parentSegment);
     closeSegment(parentSegment);
     parentSegment = null;
-  }
+  } */
   if (childSegment) {
     console.log('Close childSegment', childSegment);
-    closeSegment(childSegment);
+    // closeSegment(childSegment);
+    childSegment.close();
     childSegment = null;
   }
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
