@@ -31,6 +31,7 @@ console.log({ gcloud_aws_version: process.env.PACKAGE_VERSION });
 //  Allow AWS X-Ray to capture trace.
 //  eslint-disable-next-line import/no-unresolved
 const AWSXRay = require('aws-xray-sdk-core');
+AWSXRay.enableManualMode();
 AWSXRay.setStreamingThreshold(0);  //  TODO: Send XRay events immediately.
 AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-property-newline
   rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', // eslint-disable-next-line object-property-newline
