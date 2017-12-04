@@ -31,6 +31,7 @@ console.log({ version: process.env.PACKAGE_VERSION });
 //  Allow AWS X-Ray to capture trace.
 //  eslint-disable-next-line import/no-unresolved
 const AWSXRay = require('aws-xray-sdk-core');
+AWSXRay.setStreamingThreshold(0);  //  TODO: Send XRay events immediately.
 AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-property-newline
   rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', // eslint-disable-next-line object-property-newline
     fixed_target: 0, rate: 1.0,
@@ -39,6 +40,7 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
+//  Extend the AWS whitelist to allow these functions to log.
 AWSXRay.appendAWSWhitelist({
   services: {
     xray: {
