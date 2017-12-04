@@ -296,7 +296,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   if (traceId && childSegmentId) {
     //  Create a new segment with annotations to AWS but remove them from the payload.
     const segmentId = newSegmentId();
-    const annotations = {};
+    const annotations = null;
+    /* const annotations = {};
     const body = payloadObj.body || {};
     for (const key of Object.keys(body)) {
       //  Log only scalar values.
@@ -304,7 +305,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       if (val === null || val === undefined) continue;
       if (typeof val === 'object') continue;
       annotations[key] = val;
-    }
+    } */
     const segment = openSegment(traceId, segmentId, childSegmentId, `sendto_${topic}`, annotations);
     const segmentWithoutAnnotations = Object.assign({}, segment);
     if (segmentWithoutAnnotations.annotations) delete segmentWithoutAnnotations.annotations;
