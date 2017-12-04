@@ -324,7 +324,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     const name = topic.split('/').join('_');
     const segment = AWSXRay.getSegment();
     const subsegment = segment.addNewSubsegment(name);
-    payloadObj.rootTraceId = [subsegment.trace_id, subsegment.id].join('|');
+    payloadObj.rootTraceId = [subsegment.segment.trace_id, subsegment.id].join('|');
     console.log('sendIoTMessage', subsegment);
   }
 
