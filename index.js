@@ -301,7 +301,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const topic = (topic0 || '').split('.').join('/');
   const payloadObj = JSON.parse(payload0);
   //  TODO: Obsolete.
-  if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
+  // if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
   if (traceId && childSegmentId) {
     //  Create a new segment with annotations to AWS but remove them from the payload.
     const segmentId = newSegmentId();
@@ -318,9 +318,15 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     if (segment.annotations) delete segment.annotations;
     payloadObj.traceSegment = JSON.parse(JSON.stringify(segment));
   }
-  //  Create subsegment.
-  const subsegment = new AWSXRay.Subsegment(topic.split('/').join('_'));
-  console.log('sendIoTMessage', subsegment);
+
+  {
+    //  Create subsegment.
+    const name = topic.split('/').join('_');
+    const segment = AWSXRay.getSegment();
+    const subsegment = segment.addNewSubsegment(name);
+    payloadObj.rootTraceId = [subsegment.trace_id, subsegment.id].join('|');
+    console.log('sendIoTMessage', subsegment);
+  }
 
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
@@ -530,7 +536,16 @@ function init(event, context, callback, task) {
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
 
-  if (event && event.traceSegment) {
+  if (event && event.rootTraceId) {
+    //  Set the environment for AWS Xray tracing.
+    //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
+    const splitId = event.rootTraceId.split('|');
+    traceId = splitId[0];
+    parentSegmentId = splitId[1];
+    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+    console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
+  }
+  /* if (event && event.traceSegment) {
     //  Set the environment for AWS Xray tracing.
     //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
     parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
@@ -538,7 +553,8 @@ function init(event, context, callback, task) {
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
-  }
+  } */
+
   //  Allow AWS X-Ray to capture trace.
   // eslint-disable-next-line import/no-unresolved,global-require,no-unused-vars
   const NOTUSED3 = `AWSXRay = require('aws-xray-sdk-core');
