@@ -129,6 +129,7 @@ let segmentPrefix = '';
 
 function sendSegment(segment) {
   //  Send the AWS XRay segment to AWS.
+  console.log('sendSegment', segment);
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(segment),
@@ -407,34 +408,6 @@ function getQueue(req, projectId0, topicName) {
     name: topicName,
     publisher: () => ({
       publish: (buffer) => {
-        // let subsegment = null;
-        /*
-        return new Promise((resolve) => {
-          //  Publish the message body as an AWS X-Ray annotation.
-          //  This allows us to trace the message processing through AWS X-Ray.
-          AWSXRay.captureAsyncFunc(topicName, (subsegment0) => {
-            subsegment = subsegment0;
-            try {
-              const msg = JSON.parse(buffer.toString());
-              const body = msg.body || msg;
-              if (!body) {
-                console.log('awsGetTopic', 'no_body');
-                return resolve('no_body');
-              }
-              for (const key of Object.keys(body)) {
-                //  Log only scalar values.
-                const val = body[key];
-                if (val === null || val === undefined) continue;
-                if (typeof val === 'object') continue;
-                subsegment.addAnnotation(key, val);
-              }
-            } catch (error) {
-              console.error('awsGetTopic', error.message, error.stack);
-            }
-            return resolve('OK');
-          });
-        })
-        */
         return Promise.resolve('OK')
           .then(() => sendIoTMessage(req, topicName, buffer.toString() /* , subsegmentId, parentId */).catch(module.exports.dumpError))
           // TODO: sendSQSMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError),
@@ -637,9 +610,9 @@ function shutdown(req, useCallback, error, result) {
     parentSegment = null;
   } */
   if (childSegment) {
-    console.log('Close childSegment', childSegment);
     closeSegment(childSegment);
     // childSegment.close();
+    console.log('Close childSegment', childSegment);
     childSegment = null;
   }
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
