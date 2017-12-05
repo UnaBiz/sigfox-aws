@@ -156,15 +156,15 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
     in_progress: true,
-    "http": {
-      "request": {
-        "method": "GET",
-        "url": "https://names.example.com/"
+    http: {
+      request: {
+        method: 'GET',
+        url: `https://${functionName}.example.com/`,
       },
-      "response": {
-        "content_length": -1,
-        "status": 200
-      }
+      response: {
+        content_length: -1,
+        status: 200,
+      },
     },
     /*
     http: {
@@ -589,6 +589,19 @@ function init(event, context, callback, task) {
   console.log('init', { event, context, callback, task, env: process.env });
   //  Generate a random prefix for the AWS XRay segment ID.
   segmentPrefix = Math.floor(Math.random() * 10000).toString(16);
+
+  if (process.env._X_AMZN_TRACE_ID) {
+    const fields = process.env._X_AMZN_TRACE_ID.split(';');
+    const parsedFields = {};
+    for (const field of fields) {
+      const fieldSplit = field.split('=');
+      const key = fieldSplit[0];
+      const val = fieldSplit[1];
+      parsedFields[key] = val;
+    }
+    openSegment(parsedFields.Root, parsedFields.Parent, null, functionName, null, null, null); //
+  }
+
   if (event && event.traceSegment) {
     //  Set the environment for AWS XRay tracing based on the traceSegment passed by previous Lambda.
     //  _X_AMZN_TRACE_ID will become 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
@@ -596,13 +609,10 @@ function init(event, context, callback, task) {
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
-
-    openSegment(traceId, parentSegmentId, null, functionName, null, null, null); //
-
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
 
-  const http = {
+  /* const http = {
     "request": {
       "method": "GET",
       "url": "https://test.example.com/"
@@ -617,7 +627,7 @@ function init(event, context, callback, task) {
   segment.http = http;
   segment.notTraced = false;
   console.log('init segment', segment);
-  segment.flush();
+  segment.flush(); */
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
