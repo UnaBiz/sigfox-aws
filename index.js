@@ -290,8 +290,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
 
     //  Close the parent segment.
     closeSegment(parentSegment);
-    parentSegment = null;
     console.log('Close parentSegment', parentSegment);
+    parentSegment = null;
   }
   const rootTraceStub = {
     traceId: [traceId, parentSegmentId].join('|'),
