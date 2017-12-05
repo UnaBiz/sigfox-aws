@@ -156,6 +156,17 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
     in_progress: true,
+    "http": {
+      "request": {
+        "method": "GET",
+        "url": "https://names.example.com/"
+      },
+      "response": {
+        "content_length": -1,
+        "status": 200
+      }
+    },
+    /*
     http: {
       request: {
         // "method": "POST",
@@ -169,6 +180,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
         status: 200,
       },
     },
+    */
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
   if (user) newSegment.user = user;
