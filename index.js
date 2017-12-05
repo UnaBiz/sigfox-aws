@@ -196,7 +196,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
     // parentSegment = new AWSXRay.Segment(traceSegment0.name, traceId, parentSegmentId);
     const segment = new AWSXRay.Segment('', traceId, traceSegment0.parent_id);
     parentSegment = segment.addNewSubsegment(traceSegment0.name);
-    parentSegment.id = traceSegment0.id;
+    Object.assign(parentSegment, traceSegment0);
     AWSXRay.setSegment(parentSegment); parentSegment.flush();
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
