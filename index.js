@@ -40,7 +40,11 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
-AWSXRay.setAWSWhitelist({});
+AWSXRay.setAWSWhitelist({
+  services: {
+  },
+});
+
 //  Clear the AWS whitelist and allow only AWS Lambda to be traced.
 /* AWSXRay.setAWSWhitelist({
   services: {
