@@ -679,11 +679,11 @@ function shutdown(req, useCallback, error, result) {
       .then((res) => { console.log('Close childSegment', res, childSegment); childSegment = null; return res; })
       .catch(err => console.error('shutdown child', err.message, err.stack)));
   }
-  if (parentSegment) {
+  /* if (parentSegment) {
     promises.push(closeSegment(parentSegment)
       .then((res) => { console.log('Close parentSegment', res, parentSegment); parentSegment = null; return res; })
       .catch(err => console.error('shutdown parent', err.message, err.stack)));
-  }
+  } */
   return Promise.all(promises)
     .then((res) => {
       console.log('shutdown', res);
