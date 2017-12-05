@@ -127,16 +127,17 @@ const namePrefix = '';  //  No prefix for segment name.
 //  Random prefix for segment ID.
 let segmentPrefix = '';
 
+const xray = new AWS.XRay();
+
 function sendSegment(segment) {
-  //  Send the AWS XRay segment to AWS.
+  //  Send the AWS XRay segment to AWS. Returns a promise.
   console.log('sendSegment', segment);
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(segment),
     ],
   };
-  const xray = new AWS.XRay();
-  xray.putTraceSegments(params).promise()
+  return xray.putTraceSegments(params).promise()
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
@@ -190,10 +191,12 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
 
 function closeSegment(segment) {
   //  Close the AWS XRay segment by sending the segment with end time to AWS.
+  //  Returns a promise.
   //  eslint-disable-next-line no-param-reassign
   segment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
   if (segment.in_progress) delete segment.in_progress;
-  sendSegment(segment);
+  return sendSegment(segment)
+    .catch(error => console.error('closeSegment', error.message, error.stack));
 }
 
 /* function newTraceId() {
@@ -444,13 +447,8 @@ function getQueue(req, projectId0, topicName) {
     publisher: () => ({
       publish: (buffer) => {
         return Promise.resolve('OK')
-          .then(() => sendIoTMessage(req, topicName, buffer.toString() /* , subsegmentId, parentId */).catch(module.exports.dumpError))
-          // TODO: sendSQSMessage(req, topicName, buffer.toString()).catch(module.exports.dumpError),
-          .then((res) => {
-            // TODO: if (subsegment) subsegment.close();
-            return res;
-          })
-          .catch(error => error);
+          .then(() => sendIoTMessage(req, topicName, buffer.toString()))
+          .catch(error => console.error('getQueue', error.message, error.stack));
       },
     }),
   };
@@ -675,24 +673,29 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
+  const promises = [];
   if (childSegment) {
-    closeSegment(childSegment);
-    // childSegment.close();
-    console.log('Close childSegment', childSegment);
-    childSegment = null;
+    promises.push(closeSegment(childSegment)
+      .then(() => { console.log('Close childSegment', childSegment); childSegment = null; })
+      .catch(err => console.error('shutdown child', err.message, err.stack)));
   }
   if (parentSegment) {
-    closeSegment(parentSegment);
-    console.log('Close parentSegment', parentSegment);
-    parentSegment = null;
+    promises.push(closeSegment(parentSegment)
+      .then(() => { console.log('Close parentSegment', parentSegment); parentSegment = null; })
+      .catch(err => console.error('shutdown parent', err.message, err.stack)));
   }
-  if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
-    const callback = req.callback;
-    if (callback && typeof callback === 'function') {
-      return Promise.resolve(callback(error, result));
-    }
-  }
-  return Promise.resolve(error || result);
+  return Promise.all(promises)
+    .then((res) => {
+      console.log('shutdown', res);
+      if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
+        const callback = req.callback;
+        if (callback && typeof callback === 'function') {
+          return Promise.resolve(callback(error, result));
+        }
+      }
+      return Promise.resolve(error || result);
+    })
+    .catch(err => console.error('shutdown', err.message, err.stack));
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
