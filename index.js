@@ -675,16 +675,16 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  /* if (parentSegment) {
-    console.log('Close parentSegment', parentSegment);
-    closeSegment(parentSegment);
-    parentSegment = null;
-  } */
   if (childSegment) {
     closeSegment(childSegment);
     // childSegment.close();
     console.log('Close childSegment', childSegment);
     childSegment = null;
+  }
+  if (parentSegment) {
+    closeSegment(parentSegment);
+    console.log('Close parentSegment', parentSegment);
+    parentSegment = null;
   }
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
