@@ -140,7 +140,7 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations) {
+function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata) {
   //  Create a new AWS XRay segment and send to AWS.
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
@@ -160,6 +160,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
   if (user) newSegment.user = user;
   if (annotations) newSegment.annotations = annotations;
+  if (metadata) newSegment.metadata = metadata;
   sendSegment(newSegment);
   return newSegment;
 }
@@ -179,7 +180,7 @@ function closeSegment(segment) {
   return trace_id;
 } */
 
-function composeAnnotations(payload) {
+function composeTraceAnnotations(payload) {
   //  Compose an AWS XRay Annotations object from the payload body.
   //  The annotations object will contain the Sigfox message values.
   const annotations = {};
@@ -193,6 +194,15 @@ function composeAnnotations(payload) {
     annotations[key] = val;
   }
   return annotations;
+}
+
+function getTraceMetadata(payload) {
+  //  Return the metadata from the payload that will be logged to AWS XRay.  This should be everything in the
+  //  message except the Sigfox message body, which is already in Annotations.
+  const metadata = Object.assign({}, payload.metadata || payload || {});
+  //  Delete the body if it exists.
+  if (metadata.body) delete metadata.body;
+  return metadata;
 }
 
 function newSegmentId() {
@@ -211,15 +221,16 @@ function startTrace(req) {
   parentSegment = AWSXRay.getSegment();
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
-  const annotations = composeAnnotations(req.body);
+  const annotations = composeTraceAnnotations(req.body);
+  const metadata = getTraceMetadata(req.body);
   const device = req.body.device;
-  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, device, annotations);
+  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, device, annotations, metadata);
   console.log('startTrace - parentSegment', parentSegment);
   //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName,
-      parentSegment.user, parentSegment.annotations);
+      parentSegment.user, parentSegment.annotations, parentSegment.metadata);
     console.log('startTrace - childSegment:', childSegment);
   }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
@@ -240,14 +251,14 @@ function createRootTrace(req, traceId0, traceSegment0) {
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
     parentSegment = openSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name,
-      traceSegment0.user, traceSegment0.annotations);
+      traceSegment0.user, traceSegment0.annotations, traceSegment0.metadata);
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
   //  Create the child segment.
   if (parentSegment) {
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName,
-      parentSegment.user, parentSegment.annotations);
+      parentSegment.user, parentSegment.annotations, parentSegment.metadata);
     closeSegment(parentSegment);
     console.log('createRootTrace - childSegment:', childSegment);
 
@@ -360,9 +371,10 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
     const name = `====_${topic}_====`;
-    const annotations = composeAnnotations(payloadObj);
+    const annotations = composeTraceAnnotations(payloadObj);
+    const metadata = getTraceMetadata(payloadObj);
     const device = payloadObj.device || payloadObj.body.device || '';
-    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations);
+    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata);
     payloadObj.traceSegment = segment;
     payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
     console.log('sendIoTMessage - segment:', segment);
