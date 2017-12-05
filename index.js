@@ -241,13 +241,13 @@ function newSegmentId() {
 function startTrace(req) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  We create the root segment for AWS XRay.
-  parentSegment = AWSXRay.getSegment();
+  /* parentSegment = AWSXRay.getSegment();
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
   const annotations = composeTraceAnnotations(req.body);
   const metadata = getTraceMetadata(req.body);
   const device = req.body.device;
-  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, device, annotations, metadata);
+  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, device, annotations, metadata); */
   console.log('startTrace - parentSegment', parentSegment);
   //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
@@ -588,18 +588,6 @@ function init(event, context, callback, task) {
   //  Generate a random prefix for the AWS XRay segment ID.
   segmentPrefix = Math.floor(Math.random() * 10000).toString(16);
 
-  if (process.env._X_AMZN_TRACE_ID) {
-    const fields = process.env._X_AMZN_TRACE_ID.split(';');
-    const parsedFields = {};
-    for (const field of fields) {
-      const fieldSplit = field.split('=');
-      const key = fieldSplit[0];
-      const val = fieldSplit[1];
-      parsedFields[key] = val;
-    }
-    openSegment(parsedFields.Root, parsedFields.Parent, null, functionName, null, null, null); //
-  }
-
   if (event && event.traceSegment) {
     //  Set the environment for AWS XRay tracing based on the traceSegment passed by previous Lambda.
     //  _X_AMZN_TRACE_ID will become 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
@@ -608,6 +596,21 @@ function init(event, context, callback, task) {
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
+  } else if (process.env._X_AMZN_TRACE_ID) {
+    //  sigfoxCallback
+    const fields = process.env._X_AMZN_TRACE_ID.split(';');
+    const parsedFields = {};
+    for (const field of fields) {
+      const fieldSplit = field.split('=');
+      const key = fieldSplit[0];
+      const val = fieldSplit[1];
+      parsedFields[key] = val;
+    }
+    traceId = parsedFields.Root;
+    const rootSegmentId = parsedFields.Parent;
+    parentSegmentId = newSegmentId();
+    parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
+      null, null, null);
   }
 
   /* const http = {
