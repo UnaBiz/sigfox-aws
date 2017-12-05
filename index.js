@@ -41,10 +41,10 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
 });
 
 //  Clear the AWS Xray whitelist to disallow any AWS functions to be traced.
-AWSXRay.setAWSWhitelist({
+/* AWSXRay.setAWSWhitelist({
   services: {
   },
-});
+}); */
 
 //  Clear the AWS Xray whitelist and allow only AWS Lambda to be traced.
 /* AWSXRay.setAWSWhitelist({
@@ -598,6 +598,21 @@ function init(event, context, callback, task) {
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
+
+  const http = {
+    "request": {
+      "method": "GET",
+      "url": "https://names.example.com/"
+    },
+    "response": {
+      "content_length": -1,
+      "status": 200
+    }
+  };
+  const segment = AWSXRay.getSegment();
+  segment.addIncomingRequestData(http);
+  segment.flush();
+
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
   //  to hang e.g. the knex library in sigfox-aws-data. Also this setting allows us
