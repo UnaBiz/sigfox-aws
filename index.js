@@ -156,6 +156,19 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
     in_progress: true,
+    http: {
+      request: {
+        // "method": "POST",
+        // "client_ip": "78.255.233.48",
+        url: `device=${annotations && annotations.device ? annotations.device : ''} / seq=${
+          annotations && annotations.seqNumber !== undefined ? annotations.seqNumber : ''}`,
+        // "user_agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:45.0) Gecko/20100101 Firefox/45.0",
+        // "x_forwarded_for": true
+      },
+      response: {
+        status: 200,
+      },
+    },
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
   if (user) newSegment.user = user;
