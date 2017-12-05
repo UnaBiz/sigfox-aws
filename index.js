@@ -40,9 +40,34 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
-//  Clear the AWS whitelist so no AWS operations will be logged.
+AWSXRay.setAWSWhitelist({});
+//  Clear the AWS whitelist and allow only AWS Lambda to be traced.
 /* AWSXRay.setAWSWhitelist({
   services: {
+    lambda: {
+      operations: {
+        invoke: {
+          request_parameters: [
+            'FunctionName',
+            'InvocationType',
+            'LogType',
+            'Qualifier',
+          ],
+          response_parameters: [
+            'FunctionError',
+            'StatusCode',
+          ],
+        },
+        invokeAsync: {
+          request_parameters: [
+            'FunctionName',
+          ],
+          response_parameters: [
+            'Status',
+          ],
+        },
+      },
+    },
   },
 }); */
 
