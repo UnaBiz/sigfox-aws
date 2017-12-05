@@ -139,13 +139,15 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name0, annotations) {
+function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations) {
   //  Create a new AWS XRay segment and send to AWS.
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
     : name0;
   const newSegment = {
-    service: 'sigfox',
+    service: {
+      name: 'sigfox',
+    },
     // version: '1.23',
     // user: 'user1',
     name: (namePrefix || '') + name,
@@ -155,6 +157,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, annotations) 
     in_progress: true,
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
+  if (user) newSegment.user = user;
   if (annotations) newSegment.annotations = annotations;
   sendSegment(newSegment);
   return newSegment;
@@ -208,12 +211,14 @@ function startTrace(req) {
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
   const annotations = composeAnnotations(req.body);
-  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, annotations);
+  const device = req.body.device;
+  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, device, annotations);
   console.log('startTrace - parentSegment', parentSegment);
   //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
     childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName,
+      parentSegment.user, parentSegment.annotations);
     console.log('startTrace - childSegment:', childSegment);
   }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
@@ -233,13 +238,15 @@ function createRootTrace(req, traceId0, traceSegment0) {
     //  Resume the segment from the previous Lambda.
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
-    parentSegment = openSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name, traceSegment0.annotations);
+    parentSegment = openSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name,
+      traceSegment0.user, traceSegment0.annotations);
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
   //  Create the child segment.
   if (parentSegment) {
     childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName,
+      parentSegment.user, parentSegment.annotations);
     closeSegment(parentSegment);
     console.log('createRootTrace - childSegment:', childSegment);
 
@@ -353,7 +360,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     //  Pass the new segment through traceSegment in the message.
     const name = `====_${topic}_====`;
     const annotations = composeAnnotations(payloadObj);
-    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, annotations);
+    const device = payloadObj.device || payloadObj.body.device || '';
+    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations);
     payloadObj.traceSegment = segment;
     payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
     console.log('sendIoTMessage - segment:', segment);
