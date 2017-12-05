@@ -136,19 +136,18 @@ function closeSegment(segment) {
   sendSegment(segment);
 }
 
-function newTraceId() {
+/* function newTraceId() {
+  //  Return a new Xray trace ID to identify a new request.
   const trace_id_time = Math.floor(Date.now() / 1000).toString(16);
-  // testSegment.id = (`0000000000000000${trace_id_time}`);
-  // testSegment.id = testSegment.id.substr(testSegment.id.length - 16);  //  16-digits
   const trace_id = `1-${trace_id_time}-123456789012345678901234`;  //  8 then 24 hex digits
   return trace_id;
-}
+} */
 
 function newSegmentId() {
-  //  Return a new segment ID to identify the segment of running code trace.
+  //  Return a new Xray segment ID to identify the segment of running request code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
   //  and convert to hex.
-  const trace_id_time = Math.floor(Date.now() / 1000).toString(16);
+  const trace_id_time = Math.floor(Date.now()).toString(16);
   let segmentId = (`0000000000000000${trace_id_time}`);
   segmentId = segmentId.substr(segmentId.length - 16);  //  16-digits
   return segmentId;
