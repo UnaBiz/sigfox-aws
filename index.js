@@ -169,7 +169,7 @@ function startTrace(/* req */) {
   if (parentSegment) {
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
-    closeSegment(parentSegment);
+    // closeSegment(parentSegment);
     /* childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     AWSXRay.setSegment(childSegment); childSegment.flush();
     parentSegment.close(); parentSegment.flush(); */
