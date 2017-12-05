@@ -146,9 +146,9 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     ? name0.replace(namePrefix, '')
     : name0;
   const newSegment = {
-    service: {
+    /* service: {
       name: 'sigfox',
-    },
+    }, */
     name: (namePrefix || '') + name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
@@ -240,17 +240,17 @@ function newSegmentId() {
   return segmentId;
 }
 
-function startTrace(/* req */) {
+function startTrace(req) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  We create the root segment for AWS XRay.
-  /* parentSegment = AWSXRay.getSegment();
+  parentSegment = AWSXRay.getSegment();
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
   const annotations = composeTraceAnnotations(req.body);
   const metadata = getTraceMetadata(req.body);
   const device = req.body.device;
   parentSegment = openSegment(traceId, parentSegmentId, null,
-    functionName, device, annotations, metadata); */
+    functionName, device, annotations, metadata);
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment to represent sigfoxCallback.
