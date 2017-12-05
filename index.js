@@ -113,14 +113,7 @@ const rootSpanStub = {
   end: () => ({}),
 };
 
-// eslint-disable-next-line no-unused-vars
-const NOTUSED = `const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
-  startSpan: (/* rootSpanName, labels */) => rootSpanStub,
-  end: () => ({}),
-};
-
-const tracing = { startTrace: () => rootTraceStub };`;
-
+//  Remember the current AWS XRay trace.
 let parentSegmentId = null;
 let childSegmentId = null;
 let parentSegment = null;
@@ -134,7 +127,7 @@ const namePrefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].j
 let segmentPrefix = '';
 
 function sendSegment(segment) {
-  //  Send the segment to AWS.
+  //  Send the AWS XRay segment to AWS.
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(segment),
@@ -145,13 +138,16 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name, annotations) {
-  //  Open the segment.
+function openSegment(traceId0, segmentId, parentSegmentId0, name0, annotations) {
+  //  Create a new AWS XRay segment and send to AWS.
+  const name = (namePrefix && namePrefix.length > 0)
+    ? name0.replace(namePrefix, '')
+    : name0;
   const newSegment = {
-    // service: 'myservice',
+    service: 'sigfox',
     // version: '1.23',
     // user: 'user1',
-    name: (namePrefix + name.replace(namePrefix, '')).split('/').join('_'),
+    name: ((namePrefix || '') + name).split('/').join('_'),
     id: segmentId,
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
@@ -164,7 +160,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name, annotations) {
 }
 
 function closeSegment(segment) {
-  //  Close the segment.
+  //  Close the AWS XRay segment by sending the segment with end time to AWS.
   //  eslint-disable-next-line no-param-reassign
   segment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
   if (segment.in_progress) delete segment.in_progress;
@@ -179,7 +175,7 @@ function closeSegment(segment) {
 } */
 
 function composeAnnotations(payload) {
-  //  Compose an AWS Xray Annotations object from the payload body.
+  //  Compose an AWS XRay Annotations object from the payload body.
   //  The annotations object will contain the Sigfox message values.
   const annotations = {};
   //  Get the values from body, else from payload if already expanded.
@@ -195,7 +191,7 @@ function composeAnnotations(payload) {
 }
 
 function newSegmentId() {
-  //  Return a new Xray segment ID to identify the segment of running request code trace.
+  //  Return a new XRay segment ID to identify the segment of running request code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
   //  and convert to hex.
   const timeHex = Math.floor(Date.now()).toString(16);
@@ -206,26 +202,19 @@ function newSegmentId() {
 
 function startTrace(req) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
-  //  Create the root segment.
-  //  parentSegment = new AWSXRay.Segment(prefix + functionName);
+  //  We create the root segment for AWS XRay.
   parentSegment = AWSXRay.getSegment();
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
   const annotations = composeAnnotations(req.body);
   parentSegment = openSegment(traceId, parentSegmentId, null, functionName, annotations);
   console.log('startTrace - parentSegment', parentSegment);
-
-  //  Create the child segment.
+  //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
-    // closeSegment(parentSegment);
-    /* childSegment = parentSegment.addNewSubsegment(prefix + functionName);
-    AWSXRay.setSegment(childSegment); childSegment.flush();
-    parentSegment.close(); parentSegment.flush(); */
     console.log('startTrace - childSegment:', childSegment);
   }
-
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, parentSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
@@ -238,23 +227,14 @@ function startTrace(req) {
 function createRootTrace(req, traceId0, traceSegment0) {
   //  Return the root trace for instrumentation.  Called by
   //  non-sigfoxCallback (e.g. routeMessage) to continue a trace.
+  //  We continue the trace passed by the previous Lambda and create a child segment.
   if (traceSegment0) {
-    /* parentSegment = JSON.parse(JSON.stringify(traceSegment0));
-    traceId = parentSegment.trace_id;
-    parentSegmentId = parentSegment.id; */
-
+    //  Resume the segment from the previous Lambda.
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
     parentSegment = openSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name, traceSegment0.annotations);
     console.log('createRootTrace - parentSegment:', parentSegment);
-
-    // parentSegment = new AWSXRay.Segment(traceSegment0.name, traceId, parentSegmentId);
-    /* const segment = new AWSXRay.Segment('', traceId, traceSegment0.parent_id);
-    parentSegment = segment.addNewSubsegment(traceSegment0.name);
-    Object.assign(parentSegment, traceSegment0);
-    AWSXRay.setSegment(parentSegment); parentSegment.flush(); */
   }
-
   //  Create the child segment.
   if (parentSegment) {
     childSegmentId = newSegmentId();
@@ -266,12 +246,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
     closeSegment(parentSegment);
     parentSegment = null;
     console.log('Close parentSegment', parentSegment);
-
-    /* childSegment = parentSegment.addNewSubsegment(prefix + functionName);
-    AWSXRay.setSegment(childSegment); childSegment.flush();
-    parentSegment.close(); parentSegment.flush(); */
   }
-  const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
+  const rootTraceStub = {
     traceId: [traceId, parentSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
     end: () => ({}),
@@ -370,23 +346,18 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const topic = (topic0 || '').split('.').join('/');
+  //  We inject a segment for the queue, e.g. ll_sigfox_types_routeMessage_ll
   const payloadObj = JSON.parse(payload0);
-
   if (childSegment) {
-    const name = topic.split('/').join('_');
+    //  Pass the new segment through traceSegment in the message.
+    const name = `ll_${topic.split('/').join('_')}_ll`;
     const annotations = composeAnnotations(payloadObj);
     const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, annotations);
     payloadObj.traceSegment = segment;
-
-    /* const segment = childSegment.addNewSubsegment(prefix + topic.split('/').join('_'));
-    payloadObj.traceSegment = Object.assign({}, segment.toJSON(), { trace_id: traceId, parent_id: childSegment.id });
-    AWSXRay.setSegment(segment); segment.flush();
-    childSegment.close(); childSegment.flush(); */
-
-    //  TODO: Obsolete.
-    payloadObj.rootTraceId = [traceId, segment.id].join('|');
+    payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
     console.log('sendIoTMessage - segment:', segment);
   }
+  //  Send the message to AWS IoT MQTT queue.
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
@@ -597,47 +568,17 @@ function init(event, context, callback, task) {
   //  Call the callback upon success or failure.
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
-
-  //  Generate a random prefix for the segment ID.
+  //  Generate a random prefix for the AWS XRay segment ID.
   segmentPrefix = Math.floor(Math.random() * 10000).toString(16);
-
-  /* if (event && event.rootTraceId) {
-    //  Set the environment for AWS Xray tracing.
-    //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
-    const splitId = event.rootTraceId.split('|');
-    traceId = splitId[0];
-    parentSegmentId = splitId[1];
-    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
-    console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
-  } */
   if (event && event.traceSegment) {
-    //  Set the environment for AWS Xray manual tracing.
-    //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
+    //  Set the environment for AWS XRay tracing based on the traceSegment passed by previous Lambda.
+    //  _X_AMZN_TRACE_ID will become 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
     parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
-
-  //  Allow AWS X-Ray to capture trace.
-  // eslint-disable-next-line import/no-unresolved,global-require,no-unused-vars
-  const NOTUSED3 = `AWSXRay = require('aws-xray-sdk-core');
-  AWSXRay.middleware.setSamplingRules({
-    rules: [{ description: 'sigfox-aws', service_name: '*', http_method: '*', url_path: '/*', fixed_target: 0, rate: 0.5 }],
-    default: { fixed_target: 1, rate: 0.5 },
-    version: 1,
-  });
-  //  Create the AWS SDK instance.
-  AWS = isProduction // eslint-disable-next-line global-require
-    ? AWSXRay.captureAWS(require('aws-sdk')) // eslint-disable-next-line global-require
-    : require('aws-sdk');
-  if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
-  else AWS.config.loadFromPath('./aws-credentials.json');
-  Iot = new AWS.Iot();
-  awsIoTDataPromise = null;`;
-  //
-
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
   //  to hang e.g. the knex library in sigfox-aws-data. Also this setting allows us
@@ -692,12 +633,6 @@ function shutdown(req, useCallback, error, result) {
     // childSegment.close();
     childSegment = null;
   }
-  //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
-  /* AWS = null; //
-  AWSXRay = null; //
-  Iot = null; //
-  awsIoTDataPromise = null; // */
-
   if (useCallback) {  //  useCallback is normally true except for sigfoxCallback.
     const callback = req.callback;
     if (callback && typeof callback === 'function') {
