@@ -240,7 +240,7 @@ function newSegmentId() {
   return segmentId;
 }
 
-function startTrace(req) {
+function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  We create the root segment for AWS XRay.
   /* parentSegment = AWSXRay.getSegment();
@@ -444,11 +444,9 @@ function getQueue(req, projectId0, topicName) {
   const topic = {
     name: topicName,
     publisher: () => ({
-      publish: (buffer) => {
-        return Promise.resolve('OK')
-          .then(() => sendIoTMessage(req, topicName, buffer.toString()))
-          .catch(error => console.error('getQueue', error.message, error.stack));
-      },
+      //  Calling publish on this queue will send an AWS IoT MQTT message.
+      publish: buffer => sendIoTMessage(req, topicName, buffer.toString())
+          .catch(error => console.error('getQueue', error.message, error.stack)),
     }),
   };
   return topic;
@@ -608,7 +606,7 @@ function init(event, context, callback, task) {
     parentSegmentId = newSegmentId();
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
       null, null, null);
-    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+    // process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('init parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
 
@@ -672,8 +670,8 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  /* const promises = [];
-  if (childSegment) {
+  const promises = [];
+  /* if (childSegment) {
     promises.push(closeSegment(childSegment)
       .then((res) => { console.log('Close childSegment', res, childSegment); childSegment = null; return res; })
       .catch(err => console.error('shutdown child', err.message, err.stack)));
