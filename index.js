@@ -156,8 +156,13 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     in_progress: true,
     http: {
       request: {
+        //  Log the device ID and sequence number into the URL.
         method: 'GET',
-        url: `https://${functionName}.example.com/`,
+        url: `https://${functionName}.example.com/${
+          (annotations && annotations.device !== undefined) ? annotations.device : ''
+        }/${
+          (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : ''
+        }`,
       },
       response: {
         content_length: -1,
@@ -594,7 +599,7 @@ function init(event, context, callback, task) {
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   } else if (process.env._X_AMZN_TRACE_ID) {
-    //  sigfoxCallback
+    //  For sigfoxCallback, we create a new segment and specify the URL.
     const fields = process.env._X_AMZN_TRACE_ID.split(';');
     const parsedFields = {};
     for (const field of fields) {
@@ -606,28 +611,13 @@ function init(event, context, callback, task) {
     traceId = parsedFields.Root;
     const rootSegmentId = parsedFields.Parent;
     parentSegmentId = newSegmentId();
+    const annotations = composeTraceAnnotations(event);
+    const metadata = getTraceMetadata(event);
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
-      null, null, null);
+      annotations.device, annotations, metadata);
     // process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('init parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
-
-  /* const http = {
-    "request": {
-      "method": "GET",
-      "url": "https://test.example.com/"
-    },
-    "response": {
-      "content_length": -1,
-      "status": 200
-    }
-  };
-  const segment = AWSXRay.getSegment();
-  // segment.addIncomingRequestData(http);
-  segment.http = http;
-  segment.notTraced = false;
-  console.log('init segment', segment);
-  segment.flush(); */
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
