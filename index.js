@@ -323,7 +323,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
 
   if (childSegment) {
     const segment = childSegment.addNewSubsegment(prefix + topic.split('/').join('_'));
-    payloadObj.traceSegment = Object.assign({}, segment.toJSON(), { trace_id: traceId });
+    payloadObj.traceSegment = Object.assign({}, segment.toJSON(), { trace_id: traceId, parent_id: childSegment.id });
     //  TODO: Obsolete.
     payloadObj.rootTraceId = [traceId, segment.id].join('|');
     AWSXRay.setSegment(segment); segment.flush();
