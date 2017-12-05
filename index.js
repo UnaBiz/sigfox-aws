@@ -131,13 +131,13 @@ const xray = new AWS.XRay();
 
 function sendSegment(segment) {
   //  Send the AWS XRay segment to AWS. Returns a promise.
-  console.log('sendSegment', segment);
   const params = {
     TraceSegmentDocuments: [
       JSON.stringify(segment),
     ],
   };
   return xray.putTraceSegments(params).promise()
+    .then((res) => { console.log('sendSegment', segment, res); return res; })
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
@@ -676,12 +676,12 @@ function shutdown(req, useCallback, error, result) {
   const promises = [];
   if (childSegment) {
     promises.push(closeSegment(childSegment)
-      .then(() => { console.log('Close childSegment', childSegment); childSegment = null; })
+      .then((res) => { console.log('Close childSegment', res, childSegment); childSegment = null; return res; })
       .catch(err => console.error('shutdown child', err.message, err.stack)));
   }
   if (parentSegment) {
     promises.push(closeSegment(parentSegment)
-      .then(() => { console.log('Close parentSegment', parentSegment); parentSegment = null; })
+      .then((res) => { console.log('Close parentSegment', res, parentSegment); parentSegment = null; return res; })
       .catch(err => console.error('shutdown parent', err.message, err.stack)));
   }
   return Promise.all(promises)
