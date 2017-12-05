@@ -158,7 +158,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
       request: {
         //  Log the device ID and sequence number into the URL.
         method: 'GET',
-        url: `https://${functionName}.example.com/${
+        url: `http://unabiz.com/${
           (annotations && annotations.device !== undefined) ? annotations.device : ''
         }/${
           (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : ''
