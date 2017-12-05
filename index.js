@@ -40,12 +40,13 @@ AWSXRay.middleware.setSamplingRules({ // eslint-disable-next-line object-propert
   version: 1,
 });
 
+//  Clear the AWS Xray whitelist to disallow any AWS functions to be traced.
 AWSXRay.setAWSWhitelist({
   services: {
   },
 });
 
-//  Clear the AWS whitelist and allow only AWS Lambda to be traced.
+//  Clear the AWS Xray whitelist and allow only AWS Lambda to be traced.
 /* AWSXRay.setAWSWhitelist({
   services: {
     lambda: {
@@ -75,7 +76,7 @@ AWSXRay.setAWSWhitelist({
   },
 }); */
 
-//  Extend the AWS whitelist to allow these functions to log.
+//  Extend the AWS Xray whitelist to allow these functions to log.
 /* AWSXRay.appendAWSWhitelist({
   services: {
     xray: {
