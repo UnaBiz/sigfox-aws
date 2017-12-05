@@ -97,9 +97,10 @@ AWSXRay.setAWSWhitelist({
 }); */
 
 //  Create the AWS SDK instance.
-const AWS = isProduction
-  ? AWSXRay.captureAWS(require('aws-sdk'))
-  : require('aws-sdk');
+const AWS = require('aws-sdk');  //  Disable Xray logging for AWS requests.
+/* const AWS = isProduction
+  ? AWSXRay.captureAWS(require('aws-sdk')) //  Enable Xray logging for AWS requests.
+  : require('aws-sdk'); */
 if (isProduction) AWS.config.update({ region: process.env.AWS_REGION });
 else AWS.config.loadFromPath('./aws-credentials.json');
 
