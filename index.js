@@ -146,11 +146,9 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     ? name0.replace(namePrefix, '')
     : name0;
   const newSegment = {
-    service: {
+    /* service: {
       name: 'sigfox',
-    },
-    // version: '1.23',
-    // user: 'user1',
+    }, */
     name: (namePrefix || '') + name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
