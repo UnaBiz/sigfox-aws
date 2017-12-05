@@ -127,8 +127,6 @@ const namePrefix = '';  //  No prefix for segment name.
 //  Random prefix for segment ID.
 let segmentPrefix = '';
 
-const xray = new AWS.XRay();
-
 function sendSegment(segment) {
   //  Send the AWS XRay segment to AWS. Returns a promise.
   const params = {
@@ -136,6 +134,7 @@ function sendSegment(segment) {
       JSON.stringify(segment),
     ],
   };
+  const xray = new AWS.XRay();
   return xray.putTraceSegments(params).promise()
     .then((res) => { console.log('sendSegment', segment, res); return res; })
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
