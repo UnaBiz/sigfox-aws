@@ -169,6 +169,7 @@ function startTrace(/* req */) {
   if (parentSegment) {
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
+    closeSegment(parentSegment);
     /* childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     AWSXRay.setSegment(childSegment); childSegment.flush();
     parentSegment.close(); parentSegment.flush(); */
@@ -208,6 +209,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
   if (parentSegment) {
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
+    closeSegment(parentSegment);
     console.log('createRootTrace - childSegment:', childSegment);
     /* childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     AWSXRay.setSegment(childSegment); childSegment.flush();
@@ -666,8 +668,8 @@ function shutdown(req, useCallback, error, result) {
   } */
   if (childSegment) {
     console.log('Close childSegment', childSegment);
-    // closeSegment(childSegment);
-    childSegment.close();
+    closeSegment(childSegment);
+    // childSegment.close();
     childSegment = null;
   }
   //  console.log('shutdown', { useCallback, error, result, callback: req.callback }); //
