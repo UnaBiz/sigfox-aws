@@ -116,7 +116,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name, annotations) {
     // service: 'myservice',
     // version: '1.23',
     // user: 'user1',
-    name: (prefix + name).split('/').join('_'),
+    name: (prefix + name.replace(prefix, '')).split('/').join('_'),
     id: segmentId,
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
