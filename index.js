@@ -611,6 +611,8 @@ function init(event, context, callback, task) {
     parentSegmentId = newSegmentId();
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
       null, null, null);
+    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+    console.log('init parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
 
   /* const http = {
