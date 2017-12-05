@@ -672,12 +672,12 @@ function init(event, context, callback, task) {
 function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
-  const promises = [];
+  /* const promises = [];
   if (childSegment) {
     promises.push(closeSegment(childSegment)
       .then((res) => { console.log('Close childSegment', res, childSegment); childSegment = null; return res; })
       .catch(err => console.error('shutdown child', err.message, err.stack)));
-  }
+  } */
   /* if (parentSegment) {
     promises.push(closeSegment(parentSegment)
       .then((res) => { console.log('Close parentSegment', res, parentSegment); parentSegment = null; return res; })
