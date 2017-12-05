@@ -178,6 +178,22 @@ function closeSegment(segment) {
   return trace_id;
 } */
 
+function composeAnnotations(payload) {
+  //  Compose an AWS Xray Annotations object from the payload body.
+  //  The annotations object will contain the Sigfox message values.
+  const annotations = {};
+  //  Get the values from body, else from payload if already expanded.
+  const body = payload.body || payload || {};
+  for (const key of Object.keys(body)) {
+    //  Log only scalar values.
+    const val = body[key];
+    if (val === null || val === undefined) continue;
+    if (typeof val !== 'string' && typeof val !== 'number' && typeof val !== 'boolean') continue;
+    annotations[key] = val;
+  }
+  return annotations;
+}
+
 function newSegmentId() {
   //  Return a new Xray segment ID to identify the segment of running request code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
@@ -188,15 +204,15 @@ function newSegmentId() {
   return segmentId;
 }
 
-function startTrace(/* req */) {
+function startTrace(req) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  Create the root segment.
   //  parentSegment = new AWSXRay.Segment(prefix + functionName);
   parentSegment = AWSXRay.getSegment();
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
-  // parentSegment.flush();
-  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, null);
+  const annotations = composeAnnotations(req.body);
+  parentSegment = openSegment(traceId, parentSegmentId, null, functionName, annotations);
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment.
@@ -245,23 +261,16 @@ function createRootTrace(req, traceId0, traceSegment0) {
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName, parentSegment.annotations);
     closeSegment(parentSegment);
     console.log('createRootTrace - childSegment:', childSegment);
+
+    //  Close the parent segment.
+    closeSegment(parentSegment);
+    parentSegment = null;
+    console.log('Close parentSegment', parentSegment);
+
     /* childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     AWSXRay.setSegment(childSegment); childSegment.flush();
     parentSegment.close(); parentSegment.flush(); */
   }
-
-  //  Close the parent segment.
-  /* if (parentSegment) {
-    console.log('Close parentSegment', parentSegment);
-    closeSegment(parentSegment);
-    parentSegment = null;
-  } */
-
-  //  Get trace ID and segment ID.
-  /* const segment = AWSXRay.getSegment();
-  traceId = (segment && segment.trace_id) ? segment.trace_id : null;
-  const segmentId = segment.id; */
-
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
     traceId: [traceId, parentSegmentId].join('|'),
     startSpan: (/* rootSpanName, labels */) => rootSpanStub,
@@ -365,7 +374,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
 
   if (childSegment) {
     const name = topic.split('/').join('_');
-    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, null);
+    const annotations = composeAnnotations(payloadObj);
+    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, annotations);
     payloadObj.traceSegment = segment;
 
     /* const segment = childSegment.addNewSubsegment(prefix + topic.split('/').join('_'));
@@ -377,33 +387,6 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     payloadObj.rootTraceId = [traceId, segment.id].join('|');
     console.log('sendIoTMessage - segment:', segment);
   }
-
-  //  TODO: Obsolete.
-  //  if (traceId && childSegmentId) payloadObj.rootTraceId = [traceId, childSegmentId].join('|');
-
-  // eslint-disable-next-line no-unused-vars
-  const NOTUSED3 = `if (traceId && childSegmentId) {
-    //  Create a new segment with annotations to AWS but remove them from the payload.
-    const segmentId = newSegmentId();
-    const annotations = null;
-    /* const annotations = {};
-    const body = payloadObj.body || {};
-    for (const key of Object.keys(body)) {
-      //  Log only scalar values.
-      const val = body[key];
-      if (val === null || val === undefined) continue;
-      if (typeof val === 'object') continue;
-      annotations[key] = val;
-    } */
-    const segment = openSegment(traceId, segmentId, childSegmentId, 'sendto_${topic}', annotations);
-    const segmentWithoutAnnotations = Object.assign({}, segment);
-    if (segmentWithoutAnnotations.annotations) delete segmentWithoutAnnotations.annotations;
-    payloadObj.traceSegment = JSON.parse(JSON.stringify(segmentWithoutAnnotations));
-    console.log('sendIoTMessage', segment);
-  }`;
-  /* const subsegment = new AWSXRay.Subsegment(topic.split('/').join('_'));
-  console.log('sendIoTMessage', subsegment); */
-
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
