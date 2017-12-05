@@ -161,6 +161,7 @@ function startTrace(/* req */) {
   parentSegment = AWSXRay.getSegment();
   traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
+  parentSegment.flush();
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment.
@@ -168,8 +169,8 @@ function startTrace(/* req */) {
     /* childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName); */
     childSegment = parentSegment.addNewSubsegment(prefix + functionName);
-    AWSXRay.setSegment(childSegment);
-    childSegment.flush();
+    AWSXRay.setSegment(childSegment); childSegment.flush();
+    parentSegment.close(); parentSegment.flush();
     console.log('startTrace - childSegment:', childSegment);
   }
 
@@ -193,8 +194,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
     parentSegment = new AWSXRay.Segment(traceSegment0.name, traceId, parentSegmentId);
-    AWSXRay.setSegment(parentSegment);
-    parentSegment.flush();
+    AWSXRay.setSegment(parentSegment); parentSegment.flush();
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
 
@@ -203,8 +203,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
     /* childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName); */
     childSegment = parentSegment.addNewSubsegment(prefix + functionName);
-    AWSXRay.setSegment(childSegment);
-    childSegment.flush();
+    AWSXRay.setSegment(childSegment); childSegment.flush();
+    parentSegment.close(); parentSegment.flush();
     console.log('createRootTrace - childSegment:', childSegment);
   }
 
@@ -326,8 +326,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     payloadObj.traceSegment = Object.assign({}, segment.toJSON(), { trace_id: traceId });
     //  TODO: Obsolete.
     payloadObj.rootTraceId = [traceId, segment.id].join('|');
-    AWSXRay.setSegment(segment);
-    segment.flush();
+    AWSXRay.setSegment(segment); segment.flush();
+    childSegment.close(); childSegment.flush();
     console.log('sendIoTMessage - segment:', segment);
   }
 
