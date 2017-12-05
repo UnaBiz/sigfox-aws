@@ -602,7 +602,7 @@ function init(event, context, callback, task) {
   const http = {
     "request": {
       "method": "GET",
-      "url": "https://names.example.com/"
+      "url": "https://test.example.com/"
     },
     "response": {
       "content_length": -1,
@@ -612,6 +612,8 @@ function init(event, context, callback, task) {
   const segment = AWSXRay.getSegment();
   // segment.addIncomingRequestData(http);
   segment.http = http;
+  segment.notTraced = false;
+  console.log('init segment', segment);
   segment.flush();
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
