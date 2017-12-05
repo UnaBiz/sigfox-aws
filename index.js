@@ -96,7 +96,11 @@ let parentSegment = null;
 let childSegment = null;
 let traceId = null;
 
-const prefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join(''); //
+//  Prefix all segment names by the version number.
+const namePrefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join('');
+
+//  Random prefix for segment ID.
+let segmentPrefix = '';
 
 function sendSegment(segment) {
   //  Send the segment to AWS.
@@ -116,7 +120,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name, annotations) {
     // service: 'myservice',
     // version: '1.23',
     // user: 'user1',
-    name: (prefix + name.replace(prefix, '')).split('/').join('_'),
+    name: (namePrefix + name.replace(namePrefix, '')).split('/').join('_'),
     id: segmentId,
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
@@ -147,8 +151,8 @@ function newSegmentId() {
   //  Return a new Xray segment ID to identify the segment of running request code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
   //  and convert to hex.
-  const trace_id_time = Math.floor(Date.now()).toString(16);
-  let segmentId = (`0000000000000000${trace_id_time}`);
+  const timeHex = Math.floor(Date.now()).toString(16);
+  let segmentId = (`0000000000000000${segmentPrefix}0${timeHex}`);
   segmentId = segmentId.substr(segmentId.length - 16);  //  16-digits
   return segmentId;
 }
@@ -579,6 +583,9 @@ function init(event, context, callback, task) {
   //  Call the callback upon success or failure.
   //  Returns a promise.
   console.log('init', { event, context, callback, task, env: process.env });
+
+  //  Generate a random prefix for the segment ID.
+  segmentPrefix = Math.floor(Math.random() * 10000).toString(16);
 
   /* if (event && event.rootTraceId) {
     //  Set the environment for AWS Xray tracing.
