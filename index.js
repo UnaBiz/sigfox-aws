@@ -148,7 +148,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, annotations) 
     service: 'sigfox',
     // version: '1.23',
     // user: 'user1',
-    name: ((namePrefix || '') + name).split('/').join('_'),
+    name: (namePrefix || '') + name,
     id: segmentId,
     start_time: Date.now() / 1000.0,
     trace_id: traceId0,
@@ -351,7 +351,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const payloadObj = JSON.parse(payload0);
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
-    const name = `====${topic}====`;
+    const name = `====_${topic}_====`;
     const annotations = composeAnnotations(payloadObj);
     const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, annotations);
     payloadObj.traceSegment = segment;
