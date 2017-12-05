@@ -163,16 +163,13 @@ function startTrace(/* req */) {
   parentSegmentId = parentSegment.id;
   console.log('startTrace - parentSegment', parentSegment);
 
-  /* traceId = newTraceId();
-  childSegmentId = newSegmentId();
-  const segment = openSegment(traceId, childSegmentId, null, prefix + functionName, null); */
-
   //  Create the child segment.
   if (parentSegment) {
     /* childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName); */
     childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     AWSXRay.setSegment(childSegment);
+    childSegment.flush();
     console.log('startTrace - childSegment:', childSegment);
   }
 
@@ -196,7 +193,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
     parentSegment = new AWSXRay.Segment(traceSegment0.name, traceId, parentSegmentId);
-    // AWSXRay.setSegment(parentSegment);
+    AWSXRay.setSegment(parentSegment);
+    parentSegment.flush();
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
 
@@ -206,6 +204,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName); */
     childSegment = parentSegment.addNewSubsegment(prefix + functionName);
     AWSXRay.setSegment(childSegment);
+    childSegment.flush();
     console.log('createRootTrace - childSegment:', childSegment);
   }
 
@@ -328,6 +327,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     //  TODO: Obsolete.
     payloadObj.rootTraceId = [traceId, segment.id].join('|');
     AWSXRay.setSegment(segment);
+    segment.flush();
     console.log('sendIoTMessage - segment:', segment);
   }
 
