@@ -34,8 +34,8 @@ const AWSXRay = require('aws-xray-sdk-core');
 AWSXRay.setStreamingThreshold(0);  //  TODO: Send XRay events immediately.
 AWSXRay.middleware.setSamplingRules({
   default: {
-    fixed_target: 20,  //  default 1
-    rate: 0.5,  //  default 0.05
+    fixed_target: 100,  //  default 1
+    rate: 0.90,  //  default 0.05
   },
   version: 1,
 });
