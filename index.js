@@ -157,20 +157,15 @@ function newSegmentId() {
 function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  Create the root segment.
-  /* const segment = AWSXRay.getSegment();
-  traceId = (segment && segment.trace_id) ? segment.trace_id : null;
-  childSegmentId = segment.id; */
-  // console.log('startTrace', segment); //
+  //  parentSegment = new AWSXRay.Segment(prefix + functionName);
+  parentSegment = AWSXRay.getSegment();
+  traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
+  parentSegmentId = parentSegment.id;
+  console.log('startTrace - parentSegment', parentSegment);
 
   /* traceId = newTraceId();
   childSegmentId = newSegmentId();
   const segment = openSegment(traceId, childSegmentId, null, prefix + functionName, null); */
-
-  parentSegment = new AWSXRay.Segment(prefix + functionName);
-  // AWSXRay.setSegment(parentSegment);
-  traceId = parentSegment.trace_id;
-  parentSegmentId = parentSegment.id;
-  console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment.
   if (parentSegment) {
@@ -585,7 +580,7 @@ function init(event, context, callback, task) {
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   } */
   if (event && event.traceSegment) {
-    //  Set the environment for AWS Xray tracing.
+    //  Set the environment for AWS Xray manual tracing.
     //  _X_AMZN_TRACE_ID: 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
     parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
     traceId = parentSegment.trace_id;
