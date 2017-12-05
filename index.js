@@ -596,6 +596,9 @@ function init(event, context, callback, task) {
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+
+    openSegment(traceId, parentSegmentId, null, functionName, null, null, null); //
+
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
 
