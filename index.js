@@ -121,7 +121,8 @@ let childSegment = null;
 let traceId = null;
 
 //  Prefix all segment names by the version number.
-const namePrefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join('');
+//  const namePrefix = ['a', process.env.PACKAGE_VERSION.split('.').join(''), '_'].join('');
+const namePrefix = '';  //  No prefix for segment name.
 
 //  Random prefix for segment ID.
 let segmentPrefix = '';
