@@ -351,7 +351,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const payloadObj = JSON.parse(payload0);
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
-    const name = `ll_${topic.split('/').join('_')}_ll`;
+    const name = `====${topic}====`;
     const annotations = composeAnnotations(payloadObj);
     const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, annotations);
     payloadObj.traceSegment = segment;
