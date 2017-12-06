@@ -151,7 +151,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
   if (comment) {
     const commentSplit = comment.split(' ', 2);
     method = commentSplit[0].toUpperCase();
-    url = commentSplit[1] + suffix;
+    url = comment.substr(method.length + 1) + suffix;
   }
   // const device = (annotations && annotations.device !== undefined) ? annotations.device : '';
   const seqNumber = (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : 0;
