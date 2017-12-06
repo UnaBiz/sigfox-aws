@@ -470,8 +470,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
     //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
     //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
-    traceTopic = `${device}-${segment.id}`;
-    console.log('sendIoTMessage - segment:', segment);
+    traceTopic = `sigfox/trace/${device}-${segment.id}`;
+    console.log('sendIoTMessage - segment:', segment, traceTopic);
   }
   //  Send the message to AWS IoT MQTT queue.
   const payload = JSON.stringify(payloadObj);
