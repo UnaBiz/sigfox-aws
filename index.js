@@ -140,13 +140,13 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime) {
+function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
   //  Create a new AWS XRay segment and send to AWS.  startTime (optional) is number of milliseconds since Jan 1 1970.
-  const suffix = process.env.PACKAGE_VERSION.split('.').join('');
+  const suffix = ` (${process.env.PACKAGE_VERSION.split('.').join('')})`;
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
     : name0;
-  const device = (annotations && annotations.device !== undefined) ? annotations.device : '';
+  // const device = (annotations && annotations.device !== undefined) ? annotations.device : '';
   const seqNumber = (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : 0;
   const newSegment = {
     /* service: {
@@ -162,7 +162,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
         //  Log the device ID and sequence number into the URL.
         method: 'GET',
         client_ip: `${seqNumber}.0.0.0`,
-        url: `Device ${device} / Seq ${seqNumber} (${suffix})`,
+        url: (comment || '') + suffix,
       },
       response: {
         content_length: -1,
@@ -244,9 +244,10 @@ function startTrace(/* req */) {
   //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
+    const comment = `Run Lambda Function ${functionName}`;
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
-      parentSegment.user, parentSegment.annotations, parentSegment.metadata);
+      parentSegment.user, parentSegment.annotations, parentSegment.metadata, null, comment);
     console.log('startTrace - childSegment:', childSegment);
   }
   const rootTraceStub = {  // new tracingtrace(tracing, rootTraceId);
@@ -273,9 +274,10 @@ function createRootTrace(req, traceId0, traceSegment0) {
   //  Create the child segment.
   if (parentSegment) {
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
+    const comment = `Run Lambda Function ${functionName}`;
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
-      parentSegment.user, parentSegment.annotations, parentSegment.metadata);
+      parentSegment.user, parentSegment.annotations, parentSegment.metadata, null, comment);
     console.log('createRootTrace - childSegment:', childSegment);
 
     //  Close the parent segment.
@@ -289,6 +291,63 @@ function createRootTrace(req, traceId0, traceSegment0) {
     end: () => ({}),
   };
   return rootTraceStub;
+}
+
+function initTrace(event, context) {
+  //  During startup, create the trace segments.
+  const startTime = context.autoinstallStart;  //  Use autoinstall start time as start time.
+  const body = (typeof event.body === 'string') ? JSON.parse(event.body) : event.body;
+  const annotations = composeTraceAnnotations(body);
+  const metadata = getTraceMetadata(event);
+  const prefix = getLambdaPrefix(annotations);
+  console.log('initTrace', { body, annotations, metadata });
+
+  if (process.env._X_AMZN_TRACE_ID && !event.traceSegment) {
+    //  This is the first Lambda in the chain, i.e. sigfoxCallback.
+    //  For sigfoxCallback, we create a new segment and specify the URL.
+    //  Set the environment for AWS XRay tracing based on a new trace ID.
+
+    //  Get the trace ID from environment.
+    //  _X_AMZN_TRACE_ID contains 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
+    const fields = process.env._X_AMZN_TRACE_ID.split(';');
+    const parsedFields = {};
+    for (const field of fields) {
+      const fieldSplit = field.split('=');
+      const key = fieldSplit[0];
+      const val = fieldSplit[1];
+      parsedFields[key] = val;
+    }
+    traceId = parsedFields.Root;
+    const rootSegmentId = parsedFields.Parent;
+
+    //  Create a new segment.
+    const comment = 'Receive message from Sigfox via HTTP POST Callback';
+    parentSegmentId = newSegmentId();
+    parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, prefix + functionName,
+      annotations.device, annotations, metadata, startTime, comment);
+  } else if (event.traceSegment) {
+    //  This is the second or later Lambda in the chain, e.g. routeMessage, decodeStructuredMessage.
+    //  Set the environment for AWS XRay tracing based on the traceSegment passed by previous Lambda.
+    //  _X_AMZN_TRACE_ID will become 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
+    parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
+    traceId = parentSegment.trace_id;
+    parentSegmentId = parentSegment.id;
+  }
+  //  Update the environment.
+  process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+
+  //  Create a segment for autoinstall and close it.
+  let autoinstallSegment = null;
+  if (startTime) {
+    //  name = 2C30EB_@_autoinstall_sigfoxCallback
+    const name = `${prefix}autoinstall_${functionName}`;
+    const comment = `Autoinstall modules for ${functionName}`;
+    autoinstallSegment = openSegment(traceId, newSegmentId(), parentSegmentId, name,
+      annotations.device, annotations, metadata, startTime, comment);
+    closeSegment(autoinstallSegment);
+  }
+  console.log('initTrace parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID,
+    { autoinstallSegment });
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
@@ -387,10 +446,12 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
     const name = `====_${topic}_====`;
+    const comment = `Send message to MQTT queue ${topic}`;
     const annotations = composeTraceAnnotations(payloadObj);
     const metadata = getTraceMetadata(payloadObj);
     const device = payloadObj.device || payloadObj.body.device || '';
-    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata);
+    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
+      null, comment);
     payloadObj.traceSegment = segment;
     payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
     console.log('sendIoTMessage - segment:', segment);
@@ -573,45 +634,8 @@ function init(event, context, callback, task) {
   console.log('init', { event, context, callback, task, env: process.env });
   //  Generate a random prefix for the AWS XRay segment ID.
   segmentPrefix = Math.floor(Math.random() * 10000).toString(16);
-
-  if (event && event.traceSegment) {
-    //  Set the environment for AWS XRay tracing based on the traceSegment passed by previous Lambda.
-    //  _X_AMZN_TRACE_ID will become 'Root=1-5a24ba7c-4cfeb71c7b94c50c2f420a8c;Parent=6d0cb8bb50733c26;Sampled=1',
-    parentSegment = JSON.parse(JSON.stringify(event.traceSegment));
-    traceId = parentSegment.trace_id;
-    parentSegmentId = parentSegment.id;
-    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
-    console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
-  } else if (process.env._X_AMZN_TRACE_ID) {
-    //  For sigfoxCallback, we create a new segment and specify the URL.
-    const startTime = context.autoinstallStart;  //  Use autoinstall start time as start time.
-    const fields = process.env._X_AMZN_TRACE_ID.split(';');
-    const parsedFields = {};
-    for (const field of fields) {
-      const fieldSplit = field.split('=');
-      const key = fieldSplit[0];
-      const val = fieldSplit[1];
-      parsedFields[key] = val;
-    }
-    traceId = parsedFields.Root;
-    const rootSegmentId = parsedFields.Parent;
-    parentSegmentId = newSegmentId();
-    const body = (typeof event.body === 'string') ? JSON.parse(event.body) : event.body;
-    const annotations = composeTraceAnnotations(body);
-    const metadata = getTraceMetadata(event);
-    console.log('init', { body, annotations, metadata });
-    parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
-      annotations.device, annotations, metadata, startTime);
-    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
-
-    //  Create a segment for autoinstall and close it.
-    if (startTime) {
-      const segment = openSegment(traceId, newSegmentId(), parentSegmentId, 'autoinstall',
-        annotations.device, annotations, metadata, startTime);
-      closeSegment(segment);
-    }
-    console.log('init parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
-  }
+  //  Create the segments.
+  initTrace(event, context);
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
   //  for all functions to stop running.  This causes some background functions
