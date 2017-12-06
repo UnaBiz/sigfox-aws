@@ -484,8 +484,9 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
     .then((res) => { IotData = res; })
     .then(() => IotData.publish(params).promise())
     .then((result) => { // eslint-disable-next-line curly
-      if (trace) IotData.publish(trace).promise()  //  Send to trace queue in async mode.
-        .catch(error => console.error('publish trace', error.message, error.stack));
+      /* if (trace) IotData.publish(trace).promise()  //  Send to trace queue in async mode.
+        .catch(error => console.error('publish trace', error.message, error.stack)); */
+      if (trace) IotData.publish(trace, function (err, data) { console.log({ this0: this, err, data }); }); //
       module.exports.log(req, 'sendIoTMessage', { result, topic, payloadObj, params });
       return result;
     })
