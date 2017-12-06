@@ -2,56 +2,27 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "VisualEditor0",
       "Effect": "Allow",
       "Action": [
-        "xray:PutTraceSegments",
-        "xray:PutTelemetryRecords"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "sqs:SendMessage",
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "route53:ChangeResourceRecordSets",
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "SNS:Publish",
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:PutMetricData",
-        "cloudwatch:PutMetricAlarm"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "arn:aws:logs:*:*:*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "iot:ListThingTypes",
-        "iot:ListThings",
-        "iot:DescribeEndpoint",
-        "iot:DescribeThing",
-        "iot:DescribeThingType",
-        "iot:GetThingShadow",
-        "iot:UpdateThingShadow",
         "iot:CreateThing",
+        "cloudwatch:PutMetricData",
+        "xray:PutTelemetryRecords",
+        "SNS:Publish",
+        "iot:DescribeThing",
+        "iot:UpdateThingShadow",
+        "logs:CreateLogGroup",
+        "logs:PutLogEvents",
+        "iot:ListThingTypes",
+        "xray:PutTraceSegments",
+        "iot:DescribeEndpoint",
+        "s3:PutObject",
+        "s3:GetObject",
+        "cloudwatch:PutMetricAlarm",
+        "logs:CreateLogStream",
+        "iot:GetThingShadow",
+        "iot:ListThings",
+        "iot:DescribeThingType",
         "iot:Publish"
       ],
       "Resource": "*"

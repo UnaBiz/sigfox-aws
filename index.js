@@ -360,6 +360,53 @@ function initTrace(event, context) {
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
+//  region File Functions: Store and retrieve files from AWS S3 storage
+
+const s3 = new AWS.S3();
+
+function writeFile() {
+  var params = {
+    Body: '<Binary String>',
+    Bucket: 'examplebucket',
+    Key: 'objectkey',
+  };
+  s3.putObject(params, function(err, data) {
+    if (err) console.log(err, err.stack); // an error occurred
+    else     console.log(data);           // successful response
+    /*
+    data = {
+     ETag: "\"6805f2cfc46c0f04559748bb039d69ae\"",
+     VersionId: "Bvq0EDKxOcXLJXNo_Lkz37eM3R4pfzyQ"
+    }
+    */
+  });
+}
+
+function readFile() {
+  var params = {
+    Bucket: "examplebucket",
+    Key: "HappyFace.jpg"
+  };
+  s3.getObject(params, function(err, data) {
+    if (err) console.log(err, err.stack); // an error occurred
+    else     console.log(data);           // successful response
+    /*
+    data = {
+     AcceptRanges: "bytes",
+     ContentLength: 3191,
+     ContentType: "image/jpeg",
+     ETag: "\"6805f2cfc46c0f04559748bb039d69ae\"",
+     LastModified: <Date Representation>,
+     Metadata: {
+     },
+     TagCount: 2,
+     VersionId: "null"
+    }
+    */
+  });
+}
+
+//  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Logging Functions: Log to AWS CloudWatch
 
 //  Logger object for AWS.
