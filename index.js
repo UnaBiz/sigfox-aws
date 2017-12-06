@@ -230,13 +230,22 @@ function getTraceMetadata(payload) {
   return metadata;
 }
 
+let lastSegmentId = null;
+
 function newSegmentId() {
-  //  Return a new XRay segment ID to identify the segment of running request code trace.
+  //  Return a unique new XRay segment ID to identify the segment of running request code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
   //  and convert to hex.
-  const timeHex = Math.floor(Date.now()).toString(16);
-  let segmentId = (`0000000000000000${segmentPrefix}0${timeHex}`);
-  segmentId = segmentId.substr(segmentId.length - 16);  //  16-digits
+  const time = Date.now();
+  let segmentId = null;
+  for (let i = 0; i < 2; i += 1) {
+    //  Loop twice if the segmentId is same as previous.
+    const timeHex = Math.floor(time + i).toString(16);
+    segmentId = (`0000000000000000${segmentPrefix}0${timeHex}`);
+    segmentId = segmentId.substr(segmentId.length - 16);  //  16-digits
+    if (segmentId !== lastSegmentId) break;
+  }
+  lastSegmentId = segmentId;
   return segmentId;
 }
 
@@ -494,7 +503,7 @@ const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
 function createQueueSegment(req, topic, payloadObj) {
-  //  Create the 3 child segments (sender, rule and receiver segments) for the outgoing message.
+  //  Create the 3 child trace segments (sender, rule and receiver segments) for the outgoing message.
   //  Pass the receiver segment through traceSegment in the message.
   //  Write the 3 segments to S3 storage so that processIoTLogs can match up with AWS IoT log and open/close the
   //  segments.
