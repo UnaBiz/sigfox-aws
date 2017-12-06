@@ -26,6 +26,7 @@
     "sigfox-iot-cloud": ">=1.0.24"
   },
   "devDependencies": {
+    "aws-sdk": "^2.140.0",
     "chai": "^3.5.0",
     "chai-as-promised": "^6.0.0",
     "mockery": "^2.1.0",

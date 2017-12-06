@@ -449,7 +449,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const topic = (topic0 || '').split('.').join('/');
-  //  We inject a segment for the queue, e.g. ll_sigfox_types_routeMessage_ll
+  //  We inject a segment for the queue, e.g. ==_sigfox/types/routeMessage_==
   const payloadObj = JSON.parse(payload0);
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
@@ -600,12 +600,12 @@ function updateDeviceState(req, device0, state) {
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
 //  region Startup
 
-function prepareRequest(event /* context */) {
+function prepareRequest(event, context) {
   //  Prepare the request object and return it.
   const body = (typeof event.body === 'string')
     ? JSON.parse(event.body)  //  For HTTP request.
     : null;  //  For queue requests.
-  return { body, returnStatus: null, returnJSON: null };
+  return { body, returnStatus: null, returnJSON: null, requestId: context ? context.awsRequestId : null };
 }
 
 /* body looks like {
