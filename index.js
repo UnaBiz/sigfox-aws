@@ -289,8 +289,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
   //  Create the child segment.
   if (parentSegment) {
     const name = `${
-      (parentSegment && parentSegment.annotations && parentSegment.annotations.device) // eslint-disable-next-line prefer-template
-      ? parentSegment.annotations.device + ' @ '
+      (parentSegment.annotations && parentSegment.annotations.device) // eslint-disable-next-line prefer-template
+      ? parentSegment.annotations.device + '_@_'
       : ''
     }${functionName}`;
     childSegmentId = newSegmentId();
@@ -668,16 +668,16 @@ function shutdown(req, useCallback, error, result) {
   //  Close all cloud connections.  If useCallback is true, return the error or result
   //  to AWS through the callback.
   const promises = [];
-  /* if (childSegment) {
+  if (childSegment) {
     promises.push(closeSegment(childSegment)
       .then((res) => { console.log('Close childSegment', res, childSegment); childSegment = null; return res; })
       .catch(err => console.error('shutdown child', err.message, err.stack)));
-  } */
-  /* if (parentSegment) {
+  }
+  if (parentSegment) {
     promises.push(closeSegment(parentSegment)
       .then((res) => { console.log('Close parentSegment', res, parentSegment); parentSegment = null; return res; })
       .catch(err => console.error('shutdown parent', err.message, err.stack)));
-  } */
+  }
   return Promise.all(promises)
     .then((res) => {
       console.log('shutdown', res);
