@@ -393,7 +393,7 @@ function readFile(req, bucket, name) {
 
 function deleteFile(req, bucket, name) {
   //  Delete file from S3 bucket.  Returns a promise.
-  var params = {
+  const params = {
     Bucket: bucket,
     Key: name,
   };
