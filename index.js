@@ -146,6 +146,8 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
     : name0;
+  const device = (annotations && annotations.device !== undefined) ? annotations.device : '';
+  const seqNumber = (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : 0;
   const newSegment = {
     /* service: {
       name: 'sigfox',
@@ -159,32 +161,14 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
       request: {
         //  Log the device ID and sequence number into the URL.
         method: 'GET',
-        url: `Device ${
-          (annotations && annotations.device !== undefined) ? annotations.device : ''
-        } / Seq ${
-          (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : ''
-        } (${suffix})`,
+        client_ip: `${seqNumber}.0.0.0`,
+        url: `Device ${device} / Seq ${seqNumber} (${suffix})`,
       },
       response: {
         content_length: -1,
-        status: 200,
+        status: seqNumber,
       },
     },
-    /*
-    http: {
-      request: {
-        // "method": "POST",
-        // "client_ip": "78.255.233.48",
-        url: `device=${annotations && annotations.device ? annotations.device : ''} / seq=${
-          annotations && annotations.seqNumber !== undefined ? annotations.seqNumber : ''}`,
-        // "user_agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:45.0) Gecko/20100101 Firefox/45.0",
-        // "x_forwarded_for": true
-      },
-      response: {
-        status: 200,
-      },
-    },
-    */
   };
   if (parentSegmentId0) newSegment.parent_id = parentSegmentId0;
   if (user) newSegment.user = user;
@@ -246,22 +230,22 @@ function newSegmentId() {
   return segmentId;
 }
 
+function getLambdaPrefix(annotations) {
+  //  Prefix Lambda name by device ID.
+  return (annotations && annotations.device) // eslint-disable-next-line prefer-template
+    ? annotations.device + '_@_'
+    : '';
+}
+
 function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
-  //  We create the root segment for AWS XRay.
-  /* const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-  const annotations = composeTraceAnnotations(body);
-  const metadata = getTraceMetadata(body);
-  const device = body.device;
-  parentSegmentId = parentSegment.id;
-  parentSegment = openSegment(traceId, parentSegmentId, null,
-    functionName, device, annotations, metadata); */
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
+    const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
     childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName,
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata);
     console.log('startTrace - childSegment:', childSegment);
   }
@@ -288,15 +272,10 @@ function createRootTrace(req, traceId0, traceSegment0) {
   }
   //  Create the child segment.
   if (parentSegment) {
-    const name = `${
-      (parentSegment.annotations && parentSegment.annotations.device) // eslint-disable-next-line prefer-template
-      ? parentSegment.annotations.device + '_@_'
-      : ''
-    }${functionName}`;
+    const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata);
-    closeSegment(parentSegment);
     console.log('createRootTrace - childSegment:', childSegment);
 
     //  Close the parent segment.
