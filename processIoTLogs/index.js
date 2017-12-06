@@ -126,7 +126,7 @@ function wrap(scloud) {
 
   function writeLine(req, prefix, name, suffix, fields) { // eslint-disable-next-line prefer-template
     const filename = `${prefix ? prefix + '-' : ''}${name}${suffix ? '-' + suffix : ''}.json`;
-    return scloud.writeFile(process.env.TRACE_BUCKET, filename, fields)
+    return scloud.writeFile(req, process.env.TRACE_BUCKET, filename, fields)
       .catch((error) => { console.error('writeLine', error.message, error.log); throw error; });
   }
 
