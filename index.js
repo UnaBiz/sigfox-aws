@@ -142,6 +142,7 @@ function sendSegment(segment) {
 
 function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata) {
   //  Create a new AWS XRay segment and send to AWS.
+  const suffix = process.env.PACKAGE_VERSION.split('.').join('');
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
     : name0;
@@ -158,11 +159,11 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
       request: {
         //  Log the device ID and sequence number into the URL.
         method: 'GET',
-        url: `http://a${process.env.PACKAGE_VERSION.split('.').join('')}/${
+        url: `Device ${
           (annotations && annotations.device !== undefined) ? annotations.device : ''
-        }/${
+        } / Seq ${
           (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : ''
-        }`,
+        } (${suffix})`,
       },
       response: {
         content_length: -1,
@@ -245,17 +246,16 @@ function newSegmentId() {
   return segmentId;
 }
 
-function startTrace(req) {
+function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  We create the root segment for AWS XRay.
-  parentSegment = AWSXRay.getSegment();
-  traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
+  /* traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
   parentSegmentId = parentSegment.id;
   const annotations = composeTraceAnnotations(req.body);
   const metadata = getTraceMetadata(req.body);
   const device = req.body.device;
   parentSegment = openSegment(traceId, parentSegmentId, null,
-    functionName, device, annotations, metadata);
+    functionName, device, annotations, metadata); */
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment to represent sigfoxCallback.
@@ -288,8 +288,13 @@ function createRootTrace(req, traceId0, traceSegment0) {
   }
   //  Create the child segment.
   if (parentSegment) {
+    const name = `${
+      (parentSegment && parentSegment.annotations && parentSegment.annotations.device) // eslint-disable-next-line prefer-template
+      ? parentSegment.annotations.device + ' @ '
+      : ''
+    }${functionName}`;
     childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, functionName,
+    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata);
     closeSegment(parentSegment);
     console.log('createRootTrace - childSegment:', childSegment);
@@ -615,7 +620,7 @@ function init(event, context, callback, task) {
     const metadata = getTraceMetadata(event);
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
       annotations.device, annotations, metadata);
-    // process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+    process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
     console.log('init parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
 
