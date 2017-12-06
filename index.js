@@ -246,15 +246,16 @@ function newSegmentId() {
   return segmentId;
 }
 
-function startTrace(req) {
+function startTrace(/* req */) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  We create the root segment for AWS XRay.
-  const annotations = composeTraceAnnotations(req.body);
-  const metadata = getTraceMetadata(req.body);
-  const device = req.body.device;
+  /* const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  const annotations = composeTraceAnnotations(body);
+  const metadata = getTraceMetadata(body);
+  const device = body.device;
   parentSegmentId = parentSegment.id;
   parentSegment = openSegment(traceId, parentSegmentId, null,
-    functionName, device, annotations, metadata);
+    functionName, device, annotations, metadata); */
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment to represent sigfoxCallback.
@@ -615,7 +616,8 @@ function init(event, context, callback, task) {
     traceId = parsedFields.Root;
     const rootSegmentId = parsedFields.Parent;
     parentSegmentId = newSegmentId();
-    const annotations = composeTraceAnnotations(event);
+    const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+    const annotations = composeTraceAnnotations(body);
     const metadata = getTraceMetadata(event);
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
       annotations.device, annotations, metadata);
