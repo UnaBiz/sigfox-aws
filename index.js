@@ -141,8 +141,8 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
-  //  Create a new AWS XRay segment and send to AWS.  startTime (optional) is number of milliseconds since Jan 1 1970.
+function createSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
+  //  Create a new AWS XRay segment.  startTime (optional) is number of milliseconds since Jan 1 1970.
   const suffix = ` (${process.env.PACKAGE_VERSION.split('.').join('')})`;
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
@@ -154,12 +154,8 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     method = commentSplit[0].toUpperCase();
     url = comment.substr(method.length + 1) + suffix;
   }
-  // const device = (annotations && annotations.device !== undefined) ? annotations.device : '';
   const seqNumber = (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : 0;
   const newSegment = {
-    /* service: {
-      name: 'sigfox',
-    }, */
     name: (namePrefix || '') + name,
     id: segmentId,
     start_time: (startTime || Date.now()) / 1000.0,
@@ -182,8 +178,14 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
   if (user) newSegment.user = user;
   if (annotations) newSegment.annotations = annotations;
   if (metadata) newSegment.metadata = metadata;
-  sendSegment(newSegment);
   return newSegment;
+}
+
+function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
+  //  Create a new AWS XRay segment and send to AWS.  startTime (optional) is number of milliseconds since Jan 1 1970.
+  const segment = createSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment);
+  sendSegment(segment);
+  return segment;
 }
 
 function closeSegment(segment) {
@@ -495,6 +497,7 @@ function createQueueSegment(req, topic, payloadObj) {
   //  Create a child segment for the message queue of the message. Pass the new segment through traceSegment in the message.
   //  Write the segment to S3 storage so that processIoTLogs can match up with AWS IoT log.
   if (!childSegment) return null;
+
   const annotations = composeTraceAnnotations(payloadObj);
   const metadata = getTraceMetadata(payloadObj) || {};
   const device = payloadObj.device || payloadObj.body.device || '';
@@ -503,22 +506,31 @@ function createQueueSegment(req, topic, payloadObj) {
   const startTime = null;
   metadata.startTime = startTime;
   metadata.comment = comment;
-  const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
+
+  //  Create 3 segments but send only the first one: sender, rule, receiver.
+  const senderSegment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
     startTime, comment);
+  const ruleSegment = createSegment(traceId, newSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
+    startTime, 'Execute matching rule');
+  const receiverSegment = createSegment(traceId, newSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
+    startTime, comment);
+
   /* eslint-disable no-param-reassign */
-  payloadObj.traceSegment = segment;
-  payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
+  payloadObj.traceSegment = receiverSegment;
+  payloadObj.rootTraceId = [traceId, receiverSegment.id].join('|');  //  For info, not really used.
   /* eslint-enable no-param-reassign */
   //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
   //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
-  const traceName = `${device}-${segment.id}`;
+  const traceName = `${device}-${senderSegment.id}`;
   const traceTopic = `sigfox/trace/${traceName}`;
   if (process.env.TRACE_BUCKET) {
-    //  Save the trace file for processIoTLogs to retrieve and match later.
-    writeFile(req, process.env.TRACE_BUCKET, `${traceName}.json`, segment)
+    //  Save the 3 segments into trace file for processIoTLogs to retrieve and match later.
+    writeFile(req, process.env.TRACE_BUCKET, `${traceName}.json`, {
+      senderSegment, ruleSegment, receiverSegment,
+    })
       .catch(error => console.error('createQueueSegment', error.message, error.stack));
   }
-  console.log('createQueueSegment - segment:', segment, traceTopic);
+  console.log('createQueueSegment - segment:', senderSegment, traceTopic);
   return traceTopic;
 }
 
