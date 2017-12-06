@@ -364,10 +364,10 @@ function initTrace(event, context) {
 
 const s3 = new AWS.S3();
 
-function writeFile(req, bucket, name, body) {
-  //  Write file to S3 bucket.  Returns a promise.
+function writeFile(req, bucket, name, obj) {
+  //  Write file to S3 bucket.  Serialise the object to JSON.  Returns a promise.
   const params = {
-    Body: body,
+    Body: JSON.stringify(obj),
     Bucket: bucket,
     Key: name,
   };
@@ -379,12 +379,13 @@ function writeFile(req, bucket, name, body) {
 }
 
 function readFile(req, bucket, name) {
-  //  Read file from S3 bucket.  Returns a promise.
+  //  Read file from S3 bucket.  Returns a promise for a JavaScript object.
   const params = {
     Bucket: bucket,
     Key: name,
   };
   return s3.getObject(params).promise()
+    .then(res => (res && res.Body) ? JSON.parse(res.Body) : null)
     .catch((error) => {
       module.exports.error(req, 'readFile', { error, bucket, name });
       throw error;
@@ -490,8 +491,9 @@ function getFunctionMetadata(/* req, authClient */) {
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
-function createQueueSegment(topic, payloadObj) {
+function createQueueSegment(req, topic, payloadObj) {
   //  Create a child segment for the message queue of the message. Pass the new segment through traceSegment in the message.
+  //  Write the segment to S3 storage so that processIoTLogs can match up with AWS IoT log.
   if (!childSegment) return null;
   const annotations = composeTraceAnnotations(payloadObj);
   const metadata = getTraceMetadata(payloadObj) || {};
@@ -509,7 +511,13 @@ function createQueueSegment(topic, payloadObj) {
   /* eslint-enable no-param-reassign */
   //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
   //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
-  const traceTopic = `sigfox/trace/${device}-${segment.id}`;
+  const traceName = `${device}-${segment.id}`;
+  const traceTopic = `sigfox/trace/${traceName}`;
+  if (process.env.TRACE_BUCKET) {
+    //  Save the trace file for processIoTLogs to retrieve and match later.
+    writeFile(req, process.env.TRACE_BUCKET, `${traceName}.json`, segment)
+      .catch(error => console.error('createQueueSegment', error.message, error.stack));
+  }
   console.log('createQueueSegment - segment:', segment, traceTopic);
   return traceTopic;
 }
@@ -521,7 +529,7 @@ function sendIoTMessage(req, topic0, payload0) {
   const topic = (topic0 || '').split('.').join('/');
   //  We inject a segment for the queue, e.g. ==_sigfox/types/routeMessage_==
   const payloadObj = JSON.parse(payload0);
-  const traceTopic = createQueueSegment(topic, payloadObj);
+  const traceTopic = createQueueSegment(req, topic, payloadObj);
   const payload = JSON.stringify(payloadObj);
   //  Send the message to AWS IoT MQTT queue.
   const params = { topic, payload, qos: 0 };
