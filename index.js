@@ -476,21 +476,22 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  Send the message to AWS IoT MQTT queue.
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
-  //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
-  const trace = traceTopic ? { topic: traceTopic, payload, qos: 0 } : null;
+  //  Send the message to the trace queues for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
+  const beginTrace = traceTopic ? { topic: `${traceTopic}/begin`, payload, qos: 0 } : null;
+  const endTrace = traceTopic ? { topic: `${traceTopic}/end`, payload, qos: 0 } : null;
   let IotData = null;
   let result = null;
-  module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params, trace }); // eslint-disable-next-line no-use-before-define
+  module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params, beginTrace, endTrace }); // eslint-disable-next-line no-use-before-define
   return getIoTData(req)
     .then((res) => { IotData = res; })
     //  Send begin trace message.
-    .then(() => (trace === null) || IotData.publish(trace).promise()  //  Ignore any trace errors.
+    .then(() => (beginTrace === null) || IotData.publish(beginTrace).promise()  //  Ignore any trace errors.
       .catch(error => console.error('begin trace', error.message, error.stack)))
     //  Send actual message.
     .then(() => IotData.publish(params).promise())
     .then((res) => { result = res; })
     //  Send end trace message.
-    .then(() => (trace === null) || IotData.publish(trace).promise()  //  Ignore any trace errors.
+    .then(() => (endTrace === null) || IotData.publish(endTrace).promise()  //  Ignore any trace errors.
       .catch(error => console.error('end trace', error.message, error.stack)))
     .then(() => {
       module.exports.log(req, 'sendIoTMessage', { result, topic, payloadObj, params });
