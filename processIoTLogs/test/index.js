@@ -35,7 +35,7 @@ describe(moduleName, () => {
     // return moduleTested.flushLog(req);
   });
 
-  it('should parse line', () => {
+  it.skip('should parse lines', () => {
     // return moduleTested.task(req, device, body0, msg)
     const result = testLog.logEvents.map((event) => {
       const line = event.message;
@@ -44,5 +44,14 @@ describe(moduleName, () => {
       return res;
     });
     return Promise.resolve(result);
+  });
+
+  it('should process lines', () => {
+    // return moduleTested.task(req, device, body0, msg)
+    const result = testLog.logEvents.map((event) => {
+      const line = event.message;
+      return moduleTested.processLine(req, line);
+    });
+    return Promise.all(result);
   });
 });

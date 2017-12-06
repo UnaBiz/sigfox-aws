@@ -101,7 +101,7 @@ function wrap(scloud) {
     const fields = lineSplit[0];
     const message = lineSplit[1];
     const fieldsSplit = fields.split(' ');
-    const result = { message };
+    const result = message ? { message } : {};
     for (const field of fieldsSplit) {
       //  field contains key:value
       //  Skip number and [] fields.
@@ -124,21 +124,50 @@ function wrap(scloud) {
     return result;
   }
 
+  function writeLine(req, prefix, name, suffix, fields) { // eslint-disable-next-line prefer-template
+    const filename = `${prefix ? prefix + '-' : ''}${name}${suffix ? '-' + suffix : ''}.json`;
+    return scloud.writeFile(process.env.TRACE_BUCKET, filename, fields)
+      .catch((error) => { console.error('writeLine', error.message, error.log); throw error; });
+  }
+
   function processLine(req, line) {
+    //  Returns a promise.
+    const promises = [];
     const fields = parseLine(req, line);
+    if (fields.TRACEID) fields.trace = fields.TRACEID;
     switch (fields.EVENT) {
       case 'PublishEvent': {
         //  EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-098901602c2d0d08/begin MESSAGE:PublishIn Status: SUCCESS
         //  EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-098901602c2d0d08/end MESSAGE:PublishIn Status: SUCCESS
         //  EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60272
+        if (fields.TOPICNAME && fields.TOPICNAME.indexOf('sigfox/trace/') === 0) {
+          const topicSplit = fields.TOPICNAME.split('/');
+          fields.segment = topicSplit[2];  //  1A2345-098901602c2d0d08.
+          fields.marker = topicSplit[3];  //  begin or end.
+          //  segments-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+          promises.push(writeLine(req, 'segments', fields.segment, 'trace', fields));
+          //  trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segments: 1A2345-098901602c2d0d08 }
+          promises.push(writeLine(req, 'trace', fields.trace, 'begin', fields));
+        } else if (fields.IpAddress && fields.SourcePort) {
+          fields.address = fields.IpAddress;  //  13.229.60.16
+          fields.port = parseInt(fields.SourcePort, 10);  //  60272
+          //  trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-address.json = { address: 13.229.60.16, port: 60272 }
+          promises.push(writeLine(req, 'trace', fields.trace, 'address', fields));
+          //  address-13.229.60.16-60272.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+          promises.push(writeLine(req, 'address', fields.address, fields.port, fields));
+        }
         break;
       }
       case 'MatchingRuleFound': {
         //  EVENT:MatchingRuleFound TOPICNAME:sigfox/received CLIENTID:N/A MESSAGE:Matching rule found: sigfoxRouteMessage
+        fields.rule = fields.found;
+        //  trace-0be5ef8f-0de3-a345-ff4d-79967f07b24e-rule.json = { rule: sigfoxRouteMessage }
+        promises.push(writeLine(req, 'trace', fields.trace, 'rule', fields));
         break;
       }
       default: break;
     }
+    return Promise.all(promises);
   }
 
   const zlib = require('zlib');
