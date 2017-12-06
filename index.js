@@ -97,7 +97,8 @@ AWSXRay.middleware.setSamplingRules({
   },
 }); */
 
-//  Create the AWS SDK instance.
+//  Create the AWS SDK instance.  aws-sdk is automatically provided in AWS Lambda, no need to add to dependencies.
+//  eslint-disable-next-line import/no-extraneous-dependencies
 const AWS = require('aws-sdk');  //  Disable Xray logging for AWS requests.
 /* const AWS = isProduction
   ? AWSXRay.captureAWS(require('aws-sdk')) //  Enable Xray logging for AWS requests.
@@ -449,6 +450,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const topic = (topic0 || '').split('.').join('/');
+  let traceTopic = null;
+
   //  We inject a segment for the queue, e.g. ==_sigfox/types/routeMessage_==
   const payloadObj = JSON.parse(payload0);
   if (childSegment) {
@@ -465,15 +468,27 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
       startTime, comment);
     payloadObj.traceSegment = segment;
     payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
+    //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
+    //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
+    traceTopic = `${device}-${segment.id}`;
     console.log('sendIoTMessage - segment:', segment);
   }
   //  Send the message to AWS IoT MQTT queue.
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
-  module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params }); // eslint-disable-next-line no-use-before-define
+  //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
+  const trace = traceTopic ? { topic: traceTopic, payload, qos: 0 } : null;
+  let IotData = null;
+  module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params, trace }); // eslint-disable-next-line no-use-before-define
   return getIoTData(req)
-    .then(IotData => IotData.publish(params).promise())
-    .then(result => module.exports.log(req, 'sendIoTMessage', { result, topic, payloadObj, params }))
+    .then((res) => { IotData = res; })
+    .then(() => IotData.publish(params).promise())
+    .then((result) => {
+      IotData.publish(trace).promise()  //  Send to trace queue in async mode.
+        .catch(error => console.error('publish trace', error.message, error.stack));
+      module.exports.log(req, 'sendIoTMessage', { result, topic, payloadObj, params });
+      return result;
+    })
     .catch((error) => { module.exports.error(req, 'sendIoTMessage', { error, topic, payloadObj, params }); throw error; });
 }
 
@@ -645,7 +660,7 @@ function init(event, context, callback, task) {
   console.log('init', { event, context, callback, task, env: process.env });
   //  Generate a random prefix for the AWS XRay segment ID.
   segmentPrefix = Math.floor(Math.random() * 10000).toString(16);
-  //  Create the segments.
+  //  Create the segments for AWS XRay tracing.
   initTrace(event, context);
 
   //  This tells AWS to quit as soon as we call callback.  Else AWS will wait
