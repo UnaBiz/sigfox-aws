@@ -475,9 +475,9 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   }
   //  Send the message to AWS IoT MQTT queue.
   const payload = JSON.stringify(payloadObj);
-  const params = { topic, payload, qos: 0 };
+  const params = { topic, payload, qos: 12345678 };
   //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
-  const trace = traceTopic ? { topic: traceTopic, payload, qos: 0 } : null;
+  const trace = traceTopic ? { topic: traceTopic, payload, qos: 12345678 } : null;
   let IotData = null;
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params, trace }); // eslint-disable-next-line no-use-before-define
   return getIoTData(req)
