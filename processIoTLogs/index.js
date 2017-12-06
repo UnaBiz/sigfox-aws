@@ -36,9 +36,9 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 2017-12-06 14:13:58.484 TRACEID:15ef61e1-693b-9011-14f7-f64f9bd47c4b PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-098901602c2d0d08/begin MESSAGE:PublishIn Status: SUCCESS
 2017-12-06 14:13:58.484 TRACEID:15ef61e1-693b-9011-14f7-f64f9bd47c4b PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60272
 >>>
-[7] segments-1A2345-098901602c2d0d08.json = (segments)
-[3] segments-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
-    trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segments: 1A2345-098901602c2d0d08 }
+[7] segment-1A2345-098901602c2d0d08.json = (segment)
+[3] segment-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+    trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segment: 1A2345-098901602c2d0d08 }
 [4] trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-address.json = { address: 13.229.60.16, port: 60272 }
     address-13.229.60.16-60272.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
 
@@ -58,7 +58,7 @@ const package_json = /* eslint-disable quote-props,quotes,comma-dangle,indent */
 2017-12-06 14:13:58.670 TRACEID:55c11976-fbec-df43-86a3-3295ba6f1b89 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-098901602c2d0d08/end MESSAGE:PublishIn Status: SUCCESS
 2017-12-06 14:13:58.670 TRACEID:55c11976-fbec-df43-86a3-3295ba6f1b89 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60276
 >>>
-[2] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-end.json = { segments: 1A2345-098901602c2d0d08 }
+[2] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-end.json = { segment: 1A2345-098901602c2d0d08 }
 [1] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-address.json = { address: 13.229.60.16, port: 60276 }
     address-13.229.60.16-60276.json = { trace: 55c11976-fbec-df43-86a3-3295ba6f1b89 }
 
@@ -144,10 +144,10 @@ function wrap(scloud) {
           const topicSplit = fields.TOPICNAME.split('/');
           fields.segment = topicSplit[2];  //  1A2345-098901602c2d0d08.
           fields.marker = topicSplit[3];  //  begin or end.
-          //  segments-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
-          promises.push(writeLine(req, 'segments', fields.segment, 'trace', fields));
-          //  trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segments: 1A2345-098901602c2d0d08 }
-          promises.push(writeLine(req, 'trace', fields.trace, 'begin', fields));
+          //  segment-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+          promises.push(writeLine(req, 'segment', fields.segment, 'trace', fields));
+          //  trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segment: 1A2345-098901602c2d0d08 }
+          promises.push(writeLine(req, 'trace', fields.trace, fields.marker, fields));
         } else if (fields.IpAddress && fields.SourcePort) {
           fields.address = fields.IpAddress;  //  13.229.60.16
           fields.port = parseInt(fields.SourcePort, 10);  //  60272
