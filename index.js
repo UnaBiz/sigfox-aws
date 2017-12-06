@@ -364,46 +364,44 @@ function initTrace(event, context) {
 
 const s3 = new AWS.S3();
 
-function writeFile() {
-  var params = {
-    Body: '<Binary String>',
-    Bucket: 'examplebucket',
-    Key: 'objectkey',
+function writeFile(req, bucket, name, body) {
+  //  Write file to S3 bucket.  Returns a promise.
+  const params = {
+    Body: body,
+    Bucket: bucket,
+    Key: name,
   };
-  s3.putObject(params, function(err, data) {
-    if (err) console.log(err, err.stack); // an error occurred
-    else     console.log(data);           // successful response
-    /*
-    data = {
-     ETag: "\"6805f2cfc46c0f04559748bb039d69ae\"",
-     VersionId: "Bvq0EDKxOcXLJXNo_Lkz37eM3R4pfzyQ"
-    }
-    */
-  });
+  return s3.putObject(params).promise()
+    .catch((error) => {
+      module.exports.error(req, 'writeFile', { error, bucket, name });
+      throw error;
+    });
 }
 
-function readFile() {
-  var params = {
-    Bucket: "examplebucket",
-    Key: "HappyFace.jpg"
+function readFile(req, bucket, name) {
+  //  Read file from S3 bucket.  Returns a promise.
+  const params = {
+    Bucket: bucket,
+    Key: name,
   };
-  s3.getObject(params, function(err, data) {
-    if (err) console.log(err, err.stack); // an error occurred
-    else     console.log(data);           // successful response
-    /*
-    data = {
-     AcceptRanges: "bytes",
-     ContentLength: 3191,
-     ContentType: "image/jpeg",
-     ETag: "\"6805f2cfc46c0f04559748bb039d69ae\"",
-     LastModified: <Date Representation>,
-     Metadata: {
-     },
-     TagCount: 2,
-     VersionId: "null"
-    }
-    */
-  });
+  return s3.getObject(params).promise()
+    .catch((error) => {
+      module.exports.error(req, 'readFile', { error, bucket, name });
+      throw error;
+    });
+}
+
+function deleteFile(req, bucket, name) {
+  //  Delete file from S3 bucket.  Returns a promise.
+  var params = {
+    Bucket: bucket,
+    Key: name,
+  };
+  s3.deleteObject(params).promise()
+    .catch((error) => {
+      module.exports.error(req, 'deleteFile', { error, bucket, name });
+      throw error;
+    });
 }
 
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
@@ -524,8 +522,8 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const payload = JSON.stringify(payloadObj);
   const params = { topic, payload, qos: 0 };
   //  Send the message to the trace queues for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
-  const beginTrace = traceTopic ? { topic: `${traceTopic}/begin`, payload, qos: 0 } : null;
-  const endTrace = traceTopic ? { topic: `${traceTopic}/end`, payload, qos: 0 } : null;
+  const beginTrace = traceTopic ? { topic: `${traceTopic}/begin`, payload: '{}', qos: 0 } : null;
+  const endTrace = traceTopic ? { topic: `${traceTopic}/end`, payload: '{}', qos: 0 } : null;
   let IotData = null;
   let result = null;
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params, beginTrace, endTrace }); // eslint-disable-next-line no-use-before-define
@@ -832,6 +830,11 @@ const cloud = {
   //  Instrumentation
   startTrace,
   createRootTrace,
+
+  //  File
+  readFile,
+  writeFile,
+  deleteFile,
 
   //  Messaging
   getQueue,
