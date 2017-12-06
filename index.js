@@ -275,7 +275,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
     parentSegment = openSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name,
-      traceSegment0.user, traceSegment0.annotations, traceSegment0.metadata);
+      traceSegment0.user, traceSegment0.annotations, traceSegment0.metadata,
+      traceSegment0.metadata.startTime, traceSegment0.metadata.comment);
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
   //  Create the child segment.
@@ -453,12 +454,15 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
     const annotations = composeTraceAnnotations(payloadObj);
-    const metadata = getTraceMetadata(payloadObj);
+    const metadata = getTraceMetadata(payloadObj) || {};
     const device = payloadObj.device || payloadObj.body.device || '';
     const name = `==_${device}_@_${topic}_==`;
     const comment = 'Send message to MQTT queue';
+    const startTime = null;
+    metadata.startTime = startTime;
+    metadata.comment = comment;
     const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
-      null, comment);
+      startTime, comment);
     payloadObj.traceSegment = segment;
     payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
     console.log('sendIoTMessage - segment:', segment);
