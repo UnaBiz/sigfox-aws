@@ -452,11 +452,11 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   const payloadObj = JSON.parse(payload0);
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
-    const name = `====_${topic}_====`;
-    const comment = 'Send message to MQTT queue';
     const annotations = composeTraceAnnotations(payloadObj);
     const metadata = getTraceMetadata(payloadObj);
     const device = payloadObj.device || payloadObj.body.device || '';
+    const name = `==_${device}_@_${topic}_==`;
+    const comment = 'Send message to MQTT queue';
     const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
       null, comment);
     payloadObj.traceSegment = segment;
