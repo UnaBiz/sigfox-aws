@@ -494,16 +494,17 @@ const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
 function createQueueSegment(req, topic, payloadObj) {
-  //  Create a child segment for the message queue of the message. Pass the new segment through traceSegment in the message.
-  //  Write the segment to S3 storage so that processIoTLogs can match up with AWS IoT log.
+  //  Create the 3 child segments (sender, rule and receiver segments) for the outgoing message.
+  //  Pass the receiver segment through traceSegment in the message.
+  //  Write the 3 segments to S3 storage so that processIoTLogs can match up with AWS IoT log and open/close the
+  //  segments.
   if (!childSegment) return null;
-
   const annotations = composeTraceAnnotations(payloadObj);
   const metadata = getTraceMetadata(payloadObj) || {};
   const device = payloadObj.device || payloadObj.body.device || '';
   const name = `==_${device}_@_${topic}_==`;
   const comment = 'Send message to MQTT queue';
-  const startTime = null;
+  const startTime = Date.now();
   metadata.startTime = startTime;
   metadata.comment = comment;
 
@@ -515,6 +516,7 @@ function createQueueSegment(req, topic, payloadObj) {
   const receiverSegment = createSegment(traceId, newSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
     startTime, comment);
 
+  //  Pass the receiver segment to the payload.
   /* eslint-disable no-param-reassign */
   payloadObj.traceSegment = receiverSegment;
   payloadObj.rootTraceId = [traceId, receiverSegment.id].join('|');  //  For info, not really used.
