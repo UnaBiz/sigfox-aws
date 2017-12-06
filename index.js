@@ -246,16 +246,15 @@ function newSegmentId() {
   return segmentId;
 }
 
-function startTrace(/* req */) {
+function startTrace(req) {
   //  Start the trace.  Called by sigfoxCallback to start a trace.
   //  We create the root segment for AWS XRay.
-  /* traceId = (parentSegment && parentSegment.trace_id) ? parentSegment.trace_id : null;
-  parentSegmentId = parentSegment.id;
   const annotations = composeTraceAnnotations(req.body);
   const metadata = getTraceMetadata(req.body);
   const device = req.body.device;
+  parentSegmentId = parentSegment.id;
   parentSegment = openSegment(traceId, parentSegmentId, null,
-    functionName, device, annotations, metadata); */
+    functionName, device, annotations, metadata);
   console.log('startTrace - parentSegment', parentSegment);
 
   //  Create the child segment to represent sigfoxCallback.
