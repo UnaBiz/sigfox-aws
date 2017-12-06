@@ -146,6 +146,13 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
     : name0;
+  let method = '';
+  let url = suffix;
+  if (comment) {
+    const commentSplit = comment.split(' ', 2);
+    method = commentSplit[0].toUpperCase();
+    url = commentSplit[1] + suffix;
+  }
   // const device = (annotations && annotations.device !== undefined) ? annotations.device : '';
   const seqNumber = (annotations && annotations.seqNumber !== undefined) ? annotations.seqNumber : 0;
   const newSegment = {
@@ -160,9 +167,9 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     http: {
       request: {
         //  Log the device ID and sequence number into the URL.
-        method: 'GET',
+        method,
+        url,
         client_ip: `${seqNumber}.0.0.0`,
-        url: (comment || '') + suffix,
       },
       response: {
         content_length: -1,
@@ -244,7 +251,7 @@ function startTrace(/* req */) {
   //  Create the child segment to represent sigfoxCallback.
   if (parentSegment) {
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
-    const comment = `Run Lambda Function ${functionName}`;
+    const comment = `Run Lambda Func ${functionName}`;
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata, null, comment);
@@ -274,7 +281,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
   //  Create the child segment.
   if (parentSegment) {
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
-    const comment = `Run Lambda Function ${functionName}`;
+    const comment = `Run Lambda Func ${functionName}`;
     childSegmentId = newSegmentId();
     childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata, null, comment);
@@ -446,7 +453,7 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   if (childSegment) {
     //  Pass the new segment through traceSegment in the message.
     const name = `====_${topic}_====`;
-    const comment = `Send message to MQTT queue ${topic}`;
+    const comment = 'Send message to MQTT queue';
     const annotations = composeTraceAnnotations(payloadObj);
     const metadata = getTraceMetadata(payloadObj);
     const device = payloadObj.device || payloadObj.body.device || '';
