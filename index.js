@@ -482,10 +482,10 @@ function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
   module.exports.log(req, 'sendIoTMessage', { topic, payloadObj, params, trace }); // eslint-disable-next-line no-use-before-define
   return getIoTData(req)
     .then((res) => { IotData = res; })
-    .then(() => IotData.publish(trace).promise()  //  Ignore trace queue errors.
-      .catch(error => console.error('publish trace', error.message, error.stack)))
     .then(() => IotData.publish(params).promise())
     .then((result) => {
+      IotData.publish(trace).promise()  //  Send to trace queue in async mode.
+        .catch(error => console.error('publish trace', error.message, error.stack));
       module.exports.log(req, 'sendIoTMessage', { result, topic, payloadObj, params });
       return result;
     })
