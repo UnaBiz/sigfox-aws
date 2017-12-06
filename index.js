@@ -490,36 +490,40 @@ function getFunctionMetadata(/* req, authClient */) {
 const Iot = new AWS.Iot();
 let awsIoTDataPromise = null;
 
-function sendIoTMessage(req, topic0, payload0 /* , subsegmentId, parentId */) {
+function createQueueSegment(topic, payloadObj) {
+  //  Create a child segment for the message queue of the message. Pass the new segment through traceSegment in the message.
+  if (!childSegment) return null;
+  const annotations = composeTraceAnnotations(payloadObj);
+  const metadata = getTraceMetadata(payloadObj) || {};
+  const device = payloadObj.device || payloadObj.body.device || '';
+  const name = `==_${device}_@_${topic}_==`;
+  const comment = 'Send message to MQTT queue';
+  const startTime = null;
+  metadata.startTime = startTime;
+  metadata.comment = comment;
+  const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
+    startTime, comment);
+  /* eslint-disable no-param-reassign */
+  payloadObj.traceSegment = segment;
+  payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
+  /* eslint-enable no-param-reassign */
+  //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
+  //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
+  const traceTopic = `sigfox/trace/${device}-${segment.id}`;
+  console.log('createQueueSegment - segment:', segment, traceTopic);
+  return traceTopic;
+}
+
+function sendIoTMessage(req, topic0, payload0) {
   //  Send the text message to the AWS IoT MQTT queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
   //  to AWS MQTT format like sigfox/devices/all.
   const topic = (topic0 || '').split('.').join('/');
-  let traceTopic = null;
-
   //  We inject a segment for the queue, e.g. ==_sigfox/types/routeMessage_==
   const payloadObj = JSON.parse(payload0);
-  if (childSegment) {
-    //  Pass the new segment through traceSegment in the message.
-    const annotations = composeTraceAnnotations(payloadObj);
-    const metadata = getTraceMetadata(payloadObj) || {};
-    const device = payloadObj.device || payloadObj.body.device || '';
-    const name = `==_${device}_@_${topic}_==`;
-    const comment = 'Send message to MQTT queue';
-    const startTime = null;
-    metadata.startTime = startTime;
-    metadata.comment = comment;
-    const segment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
-      startTime, comment);
-    payloadObj.traceSegment = segment;
-    payloadObj.rootTraceId = [traceId, segment.id].join('|');  //  For info, not really used.
-    //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
-    //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
-    traceTopic = `sigfox/trace/${device}-${segment.id}`;
-    console.log('sendIoTMessage - segment:', segment, traceTopic);
-  }
-  //  Send the message to AWS IoT MQTT queue.
+  const traceTopic = createQueueSegment(topic, payloadObj);
   const payload = JSON.stringify(payloadObj);
+  //  Send the message to AWS IoT MQTT queue.
   const params = { topic, payload, qos: 0 };
   //  Send the message to the trace queues for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
   const beginTrace = traceTopic ? { topic: `${traceTopic}/begin`, payload: '{}', qos: 0 } : null;
