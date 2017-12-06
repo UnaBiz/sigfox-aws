@@ -616,9 +616,10 @@ function init(event, context, callback, task) {
     traceId = parsedFields.Root;
     const rootSegmentId = parsedFields.Parent;
     parentSegmentId = newSegmentId();
-    const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+    const body = (typeof event.body === 'string') ? JSON.parse(event.body) : event.body;
     const annotations = composeTraceAnnotations(body);
     const metadata = getTraceMetadata(event);
+    console.log('init', { body, annotations, metadata });
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
       annotations.device, annotations, metadata);
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
