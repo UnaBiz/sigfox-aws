@@ -369,7 +369,7 @@ const s3 = new AWS.S3();
 function writeFile(req, bucket, name, obj) {
   //  Write file to S3 bucket.  Serialise the object to JSON.  Returns a promise.
   const params = {
-    Body: JSON.stringify(obj),
+    Body: JSON.stringify(obj, null, 2),
     Bucket: bucket,
     Key: name,
   };
@@ -400,7 +400,7 @@ function deleteFile(req, bucket, name) {
     Bucket: bucket,
     Key: name,
   };
-  s3.deleteObject(params).promise()
+  return s3.deleteObject(params).promise()
     .catch((error) => {
       module.exports.error(req, 'deleteFile', { error, bucket, name });
       throw error;
@@ -522,11 +522,11 @@ function createQueueSegment(req, topic, payloadObj) {
   payloadObj.rootTraceId = [traceId, receiverSegment.id].join('|');  //  For info, not really used.
   /* eslint-enable no-param-reassign */
   //  Send the message to the trace queue for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
-  //  The trace topic looks like sigfox/trace/<deviceid>-<segmentid>
+  //  The trace topic looks like sigfox/trace/<deviceid>-<sendersegmentid>
   const traceName = `${device}-${senderSegment.id}`;
   const traceTopic = `sigfox/trace/${traceName}`;
   if (process.env.TRACE_BUCKET) {
-    //  Save the 3 segments into trace file for processIoTLogs to retrieve and match later.
+    //  Save the 3 segments into trace file "<deviceid>-<sendersegmentid>.json" for processIoTLogs to retrieve and match later.
     writeFile(req, process.env.TRACE_BUCKET, `${traceName}.json`, {
       senderSegment, ruleSegment, receiverSegment,
     })
@@ -547,7 +547,7 @@ function sendIoTMessage(req, topic0, payload0) {
   const payload = JSON.stringify(payloadObj);
   //  Send the message to AWS IoT MQTT queue.
   const params = { topic, payload, qos: 0 };
-  //  Send the message to the trace queues for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
+  //  Send the message to the begin and end trace queues for processIoTLogs to match up AWS IoT Rules and Lambda invocations.
   const beginTrace = traceTopic ? { topic: `${traceTopic}/begin`, payload: '{}', qos: 0 } : null;
   const endTrace = traceTopic ? { topic: `${traceTopic}/end`, payload: '{}', qos: 0 } : null;
   let IotData = null;
