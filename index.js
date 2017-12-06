@@ -140,8 +140,8 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata) {
-  //  Create a new AWS XRay segment and send to AWS.
+function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime) {
+  //  Create a new AWS XRay segment and send to AWS.  startTime (optional) is number of milliseconds since Jan 1 1970.
   const suffix = process.env.PACKAGE_VERSION.split('.').join('');
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
@@ -154,7 +154,7 @@ function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotat
     }, */
     name: (namePrefix || '') + name,
     id: segmentId,
-    start_time: Date.now() / 1000.0,
+    start_time: (startTime || Date.now()) / 1000.0,
     trace_id: traceId0,
     in_progress: true,
     http: {
@@ -584,6 +584,7 @@ function init(event, context, callback, task) {
     console.log('Updated _X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   } else if (process.env._X_AMZN_TRACE_ID) {
     //  For sigfoxCallback, we create a new segment and specify the URL.
+    const startTime = context.autoinstallStart;  //  Use autoinstall start time as start time.
     const fields = process.env._X_AMZN_TRACE_ID.split(';');
     const parsedFields = {};
     for (const field of fields) {
@@ -600,8 +601,15 @@ function init(event, context, callback, task) {
     const metadata = getTraceMetadata(event);
     console.log('init', { body, annotations, metadata });
     parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, functionName,
-      annotations.device, annotations, metadata);
+      annotations.device, annotations, metadata, startTime);
     process.env._X_AMZN_TRACE_ID = `Root=${traceId};Parent=${parentSegmentId};Sampled=1`;
+
+    //  Create a segment for autoinstall and close it.
+    if (startTime) {
+      const segment = openSegment(traceId, newSegmentId(), parentSegmentId, 'autoinstall',
+        annotations.device, annotations, metadata, startTime);
+      closeSegment(segment);
+    }
     console.log('init parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID);
   }
 
