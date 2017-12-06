@@ -580,60 +580,6 @@ function sendIoTMessage(req, topic0, payload0) {
     .catch((error) => { module.exports.error(req, 'sendIoTMessage', { error, topic, payloadObj, params }); throw error; });
 }
 
-/* AWS IoT Log will look like:
-2017-12-06 14:13:58.484 TRACEID:15ef61e1-693b-9011-14f7-f64f9bd47c4b PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-098901602c2d0d08/begin MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:13:58.484 TRACEID:15ef61e1-693b-9011-14f7-f64f9bd47c4b PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60272
->>>
-[7] segments-1A2345-098901602c2d0d08.json = (segments)
-[3] segments-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
-    trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segments: 1A2345-098901602c2d0d08 }
-[4] trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-address.json = { address: 13.229.60.16, port: 60272 }
-    address-13.229.60.16-60272.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
-
-2017-12-06 14:13:58.547 TRACEID:0be5ef8f-0de3-a345-ff4d-79967f07b24e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent TOPICNAME:sigfox/received MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:13:58.547 TRACEID:0be5ef8f-0de3-a345-ff4d-79967f07b24e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60274
-2017-12-06 14:13:58.606 TRACEID:0be5ef8f-0de3-a345-ff4d-79967f07b24e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:MatchingRuleFound TOPICNAME:sigfox/received CLIENTID:N/A MESSAGE:Matching rule found: sigfoxRouteMessage
-2017-12-06 14:13:58.606 TRACEID:0be5ef8f-0de3-a345-ff4d-79967f07b24e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [DEBUG] EVENT:LambdaActionStart TOPICNAME:sigfox/received CLIENTID:N/A MESSAGE:Starting execution of LambdaAction on topic sigfox/received
-2017-12-06 14:13:58.645 TRACEID:0be5ef8f-0de3-a345-ff4d-79967f07b24e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:LambdaActionSuccess TOPICNAME:sigfox/received CLIENTID:N/A MESSAGE:Successfully invoked lambda function. Message arrived on: sigfox/received, Action: lambda, Function: arn:aws:lambda:ap-southeast-1:112039193356:function:routeMessage StatusCode: 202, Function error: null
->>>
-    trace-0be5ef8f-0de3-a345-ff4d-79967f07b24e-address.json = { address: 13.229.60.16, port: 60274 }
-[5] address-13.229.60.16-60274.json = { trace: 0be5ef8f-0de3-a345-ff4d-79967f07b24e }
-[6] trace-0be5ef8f-0de3-a345-ff4d-79967f07b24e-rule.json = { rule: sigfoxRouteMessage }
-
-?? Starting execution of LambdaAction on topic sigfox/received
-?? Successfully invoked lambda function. Message arrived on: sigfox/received, Action: lambda, Function: arn:aws:lambda:ap-southeast-1:112039193356:function:routeMessage StatusCode: 202, Function error: null
-
-2017-12-06 14:13:58.670 TRACEID:55c11976-fbec-df43-86a3-3295ba6f1b89 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-098901602c2d0d08/end MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:13:58.670 TRACEID:55c11976-fbec-df43-86a3-3295ba6f1b89 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:sigfoxCallback [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60276
->>>
-[2] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-end.json = { segments: 1A2345-098901602c2d0d08 }
-[1] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-address.json = { address: 13.229.60.16, port: 60276 }
-    address-13.229.60.16-60276.json = { trace: 55c11976-fbec-df43-86a3-3295ba6f1b89 }
-
------
-2017-12-06 14:14:14.188 TRACEID:190cf061-c801-0527-e3f7-59f0ba46a8e2 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-0c4501602c2d4a99/begin MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:14:14.188 TRACEID:190cf061-c801-0527-e3f7-59f0ba46a8e2 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60156
-
-2017-12-06 14:14:14.252 TRACEID:b67a9142-d0b8-ded4-dc99-45680d213b61 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:PublishEvent TOPICNAME:sigfox/types/decodeStructuredMessage MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:14:14.252 TRACEID:b67a9142-d0b8-ded4-dc99-45680d213b61 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60158
-2017-12-06 14:14:14.295 TRACEID:b67a9142-d0b8-ded4-dc99-45680d213b61 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:MatchingRuleFound TOPICNAME:sigfox/types/decodeStructuredMessage CLIENTID:N/A MESSAGE:Matching rule found: sigfoxDecodeStructuredMessage
-2017-12-06 14:14:14.295 TRACEID:b67a9142-d0b8-ded4-dc99-45680d213b61 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [DEBUG] EVENT:LambdaActionStart TOPICNAME:sigfox/types/decodeStructuredMessage CLIENTID:N/A MESSAGE:Starting execution of LambdaAction on topic sigfox/types/decodeStructuredMessage
-
-2017-12-06 14:14:14.307 TRACEID:05dfc479-2f1f-a81a-d026-ea60251f6dfc PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-0c4501602c2d4a99/end MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:14:14.307 TRACEID:05dfc479-2f1f-a81a-d026-ea60251f6dfc PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 60160
-
-2017-12-06 14:14:14.368 TRACEID:b67a9142-d0b8-ded4-dc99-45680d213b61 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:routeMessage [INFO] EVENT:LambdaActionSuccess TOPICNAME:sigfox/types/decodeStructuredMessage CLIENTID:N/A MESSAGE:Successfully invoked lambda function. Message arrived on: sigfox/types/decodeStructuredMessage, Action: lambda, Function: arn:aws:lambda:ap-southeast-1:112039193356:function:decodeStructuredMessage StatusCode: 202, Function error: null
-
------
-2017-12-06 14:14:29.866 TRACEID:23879b7b-6e19-9953-2c54-6b225c311d04 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-09b201602c2d878d/begin MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:14:29.866 TRACEID:23879b7b-6e19-9953-2c54-6b225c311d04 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 54546
-
-2017-12-06 14:14:29.909 TRACEID:1665a4b5-d525-6e12-893e-cc1be9089d0e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO] EVENT:PublishEvent TOPICNAME:sigfox/types/sendToUbidots MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:14:29.909 TRACEID:1665a4b5-d525-6e12-893e-cc1be9089d0e PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 54548
-
-2017-12-06 14:14:29.948 TRACEID:fc66921e-3f4d-7f22-ede1-30e9a4f76b05 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO] EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-09b201602c2d878d/end MESSAGE:PublishIn Status: SUCCESS
-2017-12-06 14:14:29.948 TRACEID:fc66921e-3f4d-7f22-ede1-30e9a4f76b05 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO] EVENT:PublishEvent MESSAGE: IpAddress: 13.229.60.16 SourcePort: 54550
- */
 /* function sendSQSMessage(req, topic0, msg) {
   //  Send the text message to the AWS Simple Queue Service queue name.
   //  In Google Cloud topics are named like sigfox.devices.all.  We need to rename them
