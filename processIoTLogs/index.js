@@ -107,12 +107,15 @@ function wrap(scloud) {
     // line contains
     // 2017-12-06 16:05:20.742 TRACEID:b7e75c76-4c27-b1b8-9d08-44ebeeb6a991 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO]  EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-09a101602c9303d7/begin MESSAGE:PublishIn Status: SUCCESS
     if (!line || line.trim() === '') return {};
-    const timestamp = new Date(`${line.substr(0, 23).replace(' ', 'T')}Z`).valueOf();
+    const timestamp = (line[0] >= '0' && line[0] <= '9')
+      ? new Date(`${line.substr(0, 23).replace(' ', 'T')}Z`).valueOf()
+      : null;
     const lineSplit = line.split('MESSAGE:');
     const fields = lineSplit[0];
     const message = lineSplit[1];
     const fieldsSplit = fields.split(' ');
-    const result = { timestamp };
+    const result = {};
+    if (timestamp) result.timestamp = timestamp;
     if (message) result.message = message;
     for (const field of fieldsSplit) {
       //  field contains key:value
@@ -253,7 +256,7 @@ function wrap(scloud) {
 
         ruleSegment.name = `${device}_@_RULE_${fields.rule}`;
         ruleSegment.start_time = fields.timestamp / 1000.0; // eslint-disable-next-line no-param-reassign
-        ruleSegment.end_time = ruleSegment.start_time + 1;
+        ruleSegment.end_time = ruleSegment.start_time + 1;  //  Assume 1 second.
         if (ruleSegment.in_progress) delete ruleSegment.in_progress;
         scloud.sendTrace(req, ruleSegment);
 
