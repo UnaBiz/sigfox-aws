@@ -535,8 +535,8 @@ function createQueueSegment(req, topic, payloadObj) {
   const traceName = `${device}-${senderSegment.id}`;
   const traceTopic = `sigfox/trace/${traceName}`;
   if (process.env.TRACE_BUCKET) {
-    //  Save the 3 segments into trace file "segments-<deviceid>-<sendersegmentid>.json" for processIoTLogs to retrieve and match later.
-    writeFile(req, process.env.TRACE_BUCKET, `segments-${traceName}.json`, {
+    //  Save the 3 segments into trace file "segment-<deviceid>-<sendersegmentid>.json" for processIoTLogs to retrieve and match later.
+    writeFile(req, process.env.TRACE_BUCKET, `segment-${traceName}.json`, {
       senderSegment, ruleSegment, receiverSegment,
     })
       .catch(error => console.error('createQueueSegment', error.message, error.stack));
