@@ -11,6 +11,16 @@
     },
     {
       "Effect": "Allow",
+      "Action": "sqs:SendMessage",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
       "Action": "SNS:Publish",
       "Resource": "*"
     },
@@ -42,11 +52,7 @@
         "iot:GetThingShadow",
         "iot:UpdateThingShadow",
         "iot:CreateThing",
-        "iot:Publish",
-        "s3:PutObject",
-        "s3:GetObject",
-        "iot:GetThingShadow",
-        "s3:DeleteObject"
+        "iot:Publish"
       ],
       "Resource": "*"
     }
