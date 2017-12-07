@@ -283,12 +283,15 @@ function createRootTrace(req, traceId0, traceSegment0) {
   //  non-sigfoxCallback (e.g. routeMessage) to continue a trace.
   //  We continue the trace passed by the previous Lambda and create a child segment.
   if (traceSegment0) {
-    //  Resume the segment from the previous Lambda.
-    traceId = traceSegment0.trace_id;
-    parentSegmentId = traceSegment0.id;
-    parentSegment = openTraceSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name,
-      traceSegment0.user, traceSegment0.annotations, traceSegment0.metadata,
-      traceSegment0.metadata.startTime, traceSegment0.metadata.comment);
+    //  Resume the receiver segment from the previous Lambda.
+    parentSegment = traceSegment0;
+    const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
+    const comment = `Start Rule Action: Run Lambda Func ${functionName}`;
+    parentSegment.name = name;
+    parentSegment.comment = comment;
+    traceId = parentSegment.trace_id;
+    parentSegmentId = parentSegment.id;
+    sendTrace(req, parentSegment);
     console.log('createRootTrace - parentSegment:', parentSegment);
   }
   //  Create the child segment.
@@ -523,7 +526,7 @@ function createQueueSegment(req, topic, payloadObj) {
   const ruleSegment = createTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
     startTime, 'Execute matching rule');
   const receiverSegment = createTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
-    startTime, comment);
+    startTime, 'Start Lambda Function');
 
   //  Pass the receiver segment to the payload.
   /* eslint-disable no-param-reassign */
