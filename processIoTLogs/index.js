@@ -7,12 +7,19 @@
 //  Timeout: 5 min
 //  Existing Role: lambda_iot Role, which has the LambdaExecuteIoTUpdate Policy
 //    (defined in ../policy/LambdaExecuteIoTUpdate.json)
-//  Debugging: Enable active tracing
+//  Debugging: DISABLE active tracing
 //  Environment Variables:
 //    NODE_ENV=production
-//    AUTOINSTALL_DEPENDENCY=sigfox-aws/decodeStructuredMessage
+//    TRACE_BUCKET=sigfox-trace-???
 
-//  TODO: CloudWatch config
+//  In AWS IoT, enable detailed tracing
+
+//  Add Trigger:
+//  CloudWatch Logs
+//  Log Group: AWSIotLogs
+//  Filter Name: processIoTLogs
+//  Filter Pattern: (Blank)
+//  Enable Trigger: Yes
 
 /* eslint-disable max-len, camelcase, no-console, no-nested-ternary, import/no-dynamic-require, import/newline-after-import, import/no-unresolved, global-require */
 
