@@ -1,6 +1,6 @@
 {
   "name": "sigfox-aws",
-  "version": "2.0.158",
+  "version": "2.0.159",
   "description": "Framework for building a Sigfox server, based on Amazon Web Services and Lambda Functions",
   "main": "index.js",
   "scripts": {
