@@ -521,9 +521,9 @@ function createQueueSegment(req, topic, payloadObj) {
   //  Create 3 segments but send only the first one: sender, rule, receiver.
   const senderSegment = openTraceSegment(traceId, newTraceSegmentId(), childSegmentId, name, device, annotations, metadata,
     startTime, comment);
-  const ruleSegment = createTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
+  const ruleSegment = openTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
     startTime + 40, 'Apply rule with matching conditions');
-  const receiverSegment = createTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
+  const receiverSegment = openTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
     startTime + 80, 'Trigger rule action to run Lambda Func');
 
   //  Pass the receiver segment to the payload.
