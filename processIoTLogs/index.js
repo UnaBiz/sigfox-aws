@@ -255,6 +255,7 @@ function wrap(scloud) {
         req.device = device;
 
         ruleSegment.name = `${device}_@_RULE_${fields.rule}`;
+        ruleSegment.http.request.method += ` ${fields.rule}`;
         ruleSegment.start_time = fields.timestamp / 1000.0; // eslint-disable-next-line no-param-reassign
         ruleSegment.end_time = ruleSegment.start_time + 1;  //  Assume 1 second.
         if (ruleSegment.in_progress) delete ruleSegment.in_progress;
