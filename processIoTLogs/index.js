@@ -92,6 +92,7 @@ function wrap(scloud) {
   //  and ensure that cloud resources are properly disposed.
   //  eslint-disable-next-line import/no-extraneous-dependencies
   //  const scloud = require('sigfox-aws'); //  sigfox-aws Framework
+  const zlib = require('zlib');  //  Provided by AWS Lambda.
   let wrapCount = 0;  //  Count how many times the wrapper has been reused.
 
   function parseLine(req, line) {
@@ -127,13 +128,13 @@ function wrap(scloud) {
   function writeLine(req, prefix, name, suffix, fields) { // eslint-disable-next-line prefer-template
     const filename = `${prefix ? prefix + '-' : ''}${name}${suffix ? '-' + suffix : ''}.json`;
     return scloud.writeFile(req, process.env.TRACE_BUCKET, filename, fields)
-      .catch((error) => { console.error('writeLine', error.message, error.log); throw error; });
+      .catch((error) => { console.error('writeLine', filename, error.message, error.stack); throw error; });
   }
 
   function readLine(req, prefix, name, suffix) { // eslint-disable-next-line prefer-template
     const filename = `${prefix ? prefix + '-' : ''}${name}${suffix ? '-' + suffix : ''}.json`;
     return scloud.readFile(req, process.env.TRACE_BUCKET, filename)
-      .catch((error) => { console.error('readLine', error.message, error.log); throw error; });
+      .catch((error) => { console.error('readLine', filename, error.message, error.stack); throw error; });
   }
 
   function processLine(req, line) {
@@ -186,9 +187,9 @@ function wrap(scloud) {
     //  [2] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-end.json = { segment: 1A2345-098901602c2d0d08 }
       .then(() => readLine(req, 'trace', fields.endTrace, 'end'))
       .then((res) => { fields.segment = res.segment; })
-    //  [3] segment-1A2345-098901602c2d0d08-begin.json = { beginTrace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+    //  [3] segment-1A2345-098901602c2d0d08-begin.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
       .then(() => readLine(req, 'segment', fields.segment, 'begin'))
-      .then((res) => { fields.beginTrace = res.beginTrace; })
+      .then((res) => { fields.beginTrace = res.trace; })
     //  [4] trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-address.json = { address: 13.229.60.16, port: 60272 }
       .then(() => readLine(req, 'trace', fields.beginTrace, 'address'))
       .then((res) => { fields.beginAddress = res.address; fields.beginPort = res.port; })
@@ -218,53 +219,68 @@ function wrap(scloud) {
       //  [7] segment-1A2345-098901602c2d0d08.json = (segment)
       //  Return the fields for the caller to close fields.segment=segment-1A2345-098901602c2d0d08
       .then(() => fields) // eslint-disable-next-line no-param-reassign
-      .catch((error) => { error.message = `[${fields.length}] ${error.message}`; throw error; });
+      .catch((error) => { error.message = `[${Object.keys(fields).length}] ${error.message}`; throw error; });
   }
 
-  function closeSegment(req, fields) {
+  function updateTraceSegments(req, fields) {
     //  Read the sender, rule, receiver segments from S3 and open/close them.
-    let senderSegment = null;
-    let ruleSegment = null;
-    let receiverSegment = null;
     return readLine(req, 'segment', fields.segment, null)
       .then((res) => {
-        senderSegment = res.senderSegment;
-        ruleSegment = res.ruleSegment;
-        receiverSegment = res.receiverSegment;
+        const senderSegment = res.senderSegment;
+        const ruleSegment = res.ruleSegment;
+        // const receiverSegment = res.receiverSegment;
+
+        ruleSegment.name = fields.rule;
+        ruleSegment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
+        if (ruleSegment.in_progress) delete ruleSegment.in_progress;
+        scloud.sendTrace(req, ruleSegment);
+
+        senderSegment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
+        if (senderSegment.in_progress) delete senderSegment.in_progress;
+        scloud.sendTrace(req, senderSegment);
+        return { ruleSegment, senderSegment };
       })
       .catch((error) => { throw error; });
   }
 
-  const zlib = require('zlib');
-
-  function handler(event, context, callback) {
-    const payload = new Buffer(event.awslogs.data, 'base64');
-    zlib.gunzip(payload, (err, res) => {
-      if (err) {
-        return callback(err);
-      }
-      const parsed = JSON.parse(res.toString('utf8'));
-      console.log('Decoded payload:', JSON.stringify(parsed));
-      callback(null, `Successfully processed ${parsed.logEvents.length} log events.`);
-    });
-  }
-
-  function task(req, device, body0, msg) {
+  function task(req, lines) {
     //  The task for this Cloud Function: Parse the AWS IoT Log in CloudWatch format that is passed in as the
     //  parameter. Watch for any IoT Rules and Lambda Functions executed.  If detected, fetch the AWS XRay
     //  segment from AWS S3 storage and open/close the segments.
     wrapCount += 1; console.log({ wrapCount });  //  Count how many times the wrapper has been reused.
-    return Promise.resolve('OK')
-      .then(() => msg)
+    const matches = [];
+    const promises = lines.map(line => processLine(req, line)
+      .then(res => matchTrace(req, res.trace))
+      .then((res) => { matches.push(res); console.log({ result: res }); })
+      .catch((error) => { console.error('task', error.message, error.stack); }));
+    return Promise.all(promises)
+      .then(() => Promise.all(matches.map(match =>
+        updateTraceSegments(req, match)
+          .catch((error) => { console.error('task2', error.message, error.stack); return error; }))))
+      .then(result => result)
       .catch((error) => { throw error; });
   }
 
+  function main(event, context, callback) {
+    const req = {};
+    const payload = new Buffer(event.awslogs.data, 'base64');
+    zlib.gunzip(payload, (err, res) => {
+      if (err) { return callback(err); }
+      const parsed = JSON.parse(res.toString('utf8'));
+      console.log('Decoded payload:', JSON.stringify(parsed));
+      const lines = parsed.logEvents.map(ev => ev.message);
+      return task(req, lines)
+        .then(() => callback(null, `Successfully processed ${parsed.logEvents.length} log events.`))
+        .catch(error => callback(error));
+    });
+  }
+
   //  Unit Test
-  if (process.env.NODE_ENV !== 'production') return { task, parseLine, processLine };
+  if (process.env.NODE_ENV !== 'production') return { task, parseLine, processLine, matchTrace, updateTraceSegments };
 
   //  Expose these functions outside of the wrapper.
   //  When this Cloud Function is triggered, we call main() which calls task().
-  return { task };
+  return { main };
 }
 
 //  Unit Test
