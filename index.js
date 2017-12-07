@@ -523,9 +523,9 @@ function createQueueSegment(req, topic, payloadObj) {
   const senderSegment = openTraceSegment(traceId, newTraceSegmentId(), childSegmentId, name, device, annotations, metadata,
     startTime, comment);
   const ruleSegment = createTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
-    startTime + 0.04, 'Execute matching rule');
+    startTime + 0.04, 'Apply rule with matching conditions');
   const receiverSegment = createTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
-    startTime + 0.08, 'Start Lambda Function');
+    startTime + 0.08, 'Trigger action for Lambda Function');
 
   //  Pass the receiver segment to the payload.
   /* eslint-disable no-param-reassign */
