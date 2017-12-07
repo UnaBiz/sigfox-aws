@@ -287,9 +287,8 @@ function createRootTrace(req, traceId0, traceSegment0) {
     //  Resume the receiver segment from the previous Lambda.
     parentSegment = traceSegment0;
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
-    const comment = `Trigger Rule Action: Run Lambda Func ${functionName}`;
+    parentSegment.http.request.method += ` ${functionName}`;
     parentSegment.name = name;
-    parentSegment.comment = comment;
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
     sendTrace(req, parentSegment);
@@ -525,7 +524,7 @@ function createQueueSegment(req, topic, payloadObj) {
   const ruleSegment = createTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
     startTime + 40, 'Apply rule with matching conditions');
   const receiverSegment = createTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
-    startTime + 80, 'Trigger action for Lambda Function');
+    startTime + 80, 'Trigger rule action to run Lambda Func');
 
   //  Pass the receiver segment to the payload.
   /* eslint-disable no-param-reassign */
