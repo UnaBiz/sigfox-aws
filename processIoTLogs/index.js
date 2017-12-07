@@ -233,9 +233,9 @@ function wrap(scloud) {
       //  Return the fields for the caller to close fields.segment=segment-1A2345-098901602c2d0d08
       .then(() => scloud.log(req, 'matchTrace', { result: fields }))
       .then(() => fields)
-      .catch((error) => { // eslint-disable-next-line no-param-reassign
-        error.message = `[${Object.keys(fields).length}] ${error.message}`;
-        throw error;
+      .catch(() => { // eslint-disable-next-line no-param-reassign
+        scloud.error(req, 'matchTrace', { result: `[${Object.keys(fields).length}] ${endTrace}` });
+        return null;
       });
   }
 
@@ -274,7 +274,7 @@ function wrap(scloud) {
     const matches = [];
     const promises = lines.map(line => processLine(req, line)
       .then(res => matchTrace(req, res.trace))
-      .then((res) => { matches.push(res); console.log({ result: res }); })
+      .then((res) => { if (res) matches.push(res); })
       .catch((error) => { console.error('task', error.message, error.stack); }));
     return Promise.all(promises)
       .then(() => Promise.all(matches.map(match =>
