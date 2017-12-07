@@ -2,29 +2,51 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "VisualEditor0",
+      "Effect": "Allow",
+      "Action": [
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "SNS:Publish",
+      "Resource": "*"
+    },
+    {
       "Effect": "Allow",
       "Action": [
         "cloudwatch:PutMetricData",
-        "xray:PutTelemetryRecords",
-        "iot:CreateThing",
-        "SNS:Publish",
-        "iot:DescribeThing",
+        "cloudwatch:PutMetricAlarm"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "logs:CreateLogGroup",
-        "logs:PutLogEvents",
-        "iot:UpdateThingShadow",
-        "xray:PutTraceSegments",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "iot:ListThingTypes",
+        "iot:ListThings",
         "iot:DescribeEndpoint",
-        "cloudwatch:PutMetricAlarm",
+        "iot:DescribeThing",
+        "iot:DescribeThingType",
+        "iot:GetThingShadow",
+        "iot:UpdateThingShadow",
+        "iot:CreateThing",
+        "iot:Publish",
         "s3:PutObject",
         "s3:GetObject",
-        "logs:CreateLogStream",
         "iot:GetThingShadow",
-        "s3:DeleteObject",
-        "iot:ListThings",
-        "iot:DescribeThingType",
-        "iot:Publish"
+        "s3:DeleteObject"
       ],
       "Resource": "*"
     }

@@ -130,7 +130,7 @@ function wrap(scloud) {
       .catch((error) => { console.error('writeLine', error.message, error.log); throw error; });
   }
 
-  function readLine(req, prefix, name, suffix, fields) { // eslint-disable-next-line prefer-template
+  function readLine(req, prefix, name, suffix) { // eslint-disable-next-line prefer-template
     const filename = `${prefix ? prefix + '-' : ''}${name}${suffix ? '-' + suffix : ''}.json`;
     return scloud.readFile(req, process.env.TRACE_BUCKET, filename)
       .catch((error) => { console.error('readLine', error.message, error.log); throw error; });
