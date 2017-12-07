@@ -679,12 +679,14 @@ function getDeviceState(req, device0) {
 }
 
 // eslint-disable-next-line no-unused-vars
-function updateDeviceState(req, device0, state) {
+function updateDeviceState(req, device0, state0) {
   //  Update the AWS IoT Thing state for the device ID.  Returns a promise.
   //  Overwrites the existing Thing attributes with the same name.
   if (!device0) throw new Error('missing_deviceid');
   //  Capitalise device ID but not device names.
   const device = device0.length > 6 ? device0 : device0.toUpperCase();
+  //  AWS allows only max 6 levels for device state.  We truncate beyond 6 levels.
+  const state = module.exports.removeNulls(state0, -2);
   const payload = {
     state: {
       reported: state,
