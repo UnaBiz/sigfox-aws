@@ -128,7 +128,7 @@ const namePrefix = '';  //  No prefix for segment name.
 //  Random prefix for segment ID.
 let segmentPrefix = '';
 
-function sendSegment(segment) {
+function sendTrace(req, segment) {
   //  Send the AWS XRay segment to AWS. Returns a promise.
   const params = {
     TraceSegmentDocuments: [
@@ -141,7 +141,7 @@ function sendSegment(segment) {
     .catch(error => console.error('sendSegment', segment, error.message, error.stack));
 }
 
-function createSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
+function createTraceSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
   //  Create a new AWS XRay segment.  startTime (optional) is number of milliseconds since Jan 1 1970.
   const suffix = ` (${process.env.PACKAGE_VERSION.split('.').join('')})`;
   const name = (namePrefix && namePrefix.length > 0)
@@ -181,20 +181,20 @@ function createSegment(traceId0, segmentId, parentSegmentId0, name0, user, annot
   return newSegment;
 }
 
-function openSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
+function openTraceSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
   //  Create a new AWS XRay segment and send to AWS.  startTime (optional) is number of milliseconds since Jan 1 1970.
-  const segment = createSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment);
-  sendSegment(segment);
+  const segment = createTraceSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment);
+  sendTrace({}, segment);
   return segment;
 }
 
-function closeSegment(segment) {
+function closeTraceSegment(segment) {
   //  Close the AWS XRay segment by sending the segment with end time to AWS.
   //  Returns a promise.
   //  eslint-disable-next-line no-param-reassign
   segment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
   if (segment.in_progress) delete segment.in_progress;
-  return sendSegment(segment)
+  return sendTrace({}, segment)
     .catch(error => console.error('closeSegment', error.message, error.stack));
 }
 
@@ -232,7 +232,7 @@ function getTraceMetadata(payload) {
 
 let lastSegmentId = null;
 
-function newSegmentId() {
+function newTraceSegmentId() {
   //  Return a unique new XRay segment ID to identify the segment of running request code trace.
   //  Segment IDs must be 16 hex digits.  We simply take the current epoch time
   //  and convert to hex.
@@ -264,8 +264,8 @@ function startTrace(/* req */) {
   if (parentSegment) {
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
     const comment = `Run Lambda Func ${functionName}`;
-    childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
+    childSegmentId = newTraceSegmentId();
+    childSegment = openTraceSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata, null, comment);
     console.log('startTrace - childSegment:', childSegment);
   }
@@ -286,7 +286,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
     //  Resume the segment from the previous Lambda.
     traceId = traceSegment0.trace_id;
     parentSegmentId = traceSegment0.id;
-    parentSegment = openSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name,
+    parentSegment = openTraceSegment(traceId, parentSegmentId, traceSegment0.parent_id, traceSegment0.name,
       traceSegment0.user, traceSegment0.annotations, traceSegment0.metadata,
       traceSegment0.metadata.startTime, traceSegment0.metadata.comment);
     console.log('createRootTrace - parentSegment:', parentSegment);
@@ -295,13 +295,13 @@ function createRootTrace(req, traceId0, traceSegment0) {
   if (parentSegment) {
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
     const comment = `Run Lambda Func ${functionName}`;
-    childSegmentId = newSegmentId();
-    childSegment = openSegment(traceId, childSegmentId, parentSegmentId, name,
+    childSegmentId = newTraceSegmentId();
+    childSegment = openTraceSegment(traceId, childSegmentId, parentSegmentId, name,
       parentSegment.user, parentSegment.annotations, parentSegment.metadata, null, comment);
     console.log('createRootTrace - childSegment:', childSegment);
 
     //  Close the parent segment.
-    closeSegment(parentSegment);
+    closeTraceSegment(parentSegment);
     console.log('Close parentSegment', parentSegment);
     parentSegment = null;
   }
@@ -342,8 +342,8 @@ function initTrace(event, context) {
 
     //  Create a new segment.
     const comment = 'Receive message from Sigfox via HTTP POST Callback';
-    parentSegmentId = newSegmentId();
-    parentSegment = openSegment(traceId, parentSegmentId, rootSegmentId, prefix + functionName,
+    parentSegmentId = newTraceSegmentId();
+    parentSegment = openTraceSegment(traceId, parentSegmentId, rootSegmentId, prefix + functionName,
       annotations.device, annotations, metadata, startTime, comment);
   } else if (event.traceSegment) {
     //  This is the second or later Lambda in the chain, e.g. routeMessage, decodeStructuredMessage.
@@ -362,9 +362,9 @@ function initTrace(event, context) {
     //  name = 2C30EB_@_autoinstall_sigfoxCallback
     const name = `${prefix}autoinstall_${functionName}`;
     const comment = `Autoinstall modules for ${functionName}`;
-    autoinstallSegment = openSegment(traceId, newSegmentId(), parentSegmentId, name,
+    autoinstallSegment = openTraceSegment(traceId, newTraceSegmentId(), parentSegmentId, name,
       annotations.device, annotations, metadata, startTime, comment);
-    closeSegment(autoinstallSegment);
+    closeTraceSegment(autoinstallSegment);
   }
   console.log('initTrace parentSegment', parentSegment, '_X_AMZN_TRACE_ID', process.env._X_AMZN_TRACE_ID,
     { autoinstallSegment });
@@ -518,11 +518,11 @@ function createQueueSegment(req, topic, payloadObj) {
   metadata.comment = comment;
 
   //  Create 3 segments but send only the first one: sender, rule, receiver.
-  const senderSegment = openSegment(traceId, newSegmentId(), childSegmentId, name, device, annotations, metadata,
+  const senderSegment = openTraceSegment(traceId, newTraceSegmentId(), childSegmentId, name, device, annotations, metadata,
     startTime, comment);
-  const ruleSegment = createSegment(traceId, newSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
+  const ruleSegment = createTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
     startTime, 'Execute matching rule');
-  const receiverSegment = createSegment(traceId, newSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
+  const receiverSegment = createTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
     startTime, comment);
 
   //  Pass the receiver segment to the payload.
@@ -796,12 +796,12 @@ function shutdown(req, useCallback, error, result) {
   //  to AWS through the callback.
   const promises = [];
   if (childSegment) {
-    promises.push(closeSegment(childSegment)
+    promises.push(closeTraceSegment(childSegment)
       .then((res) => { console.log('Close childSegment', res, childSegment); childSegment = null; return res; })
       .catch(err => console.error('shutdown child', err.message, err.stack)));
   }
   if (parentSegment) {
-    promises.push(closeSegment(parentSegment)
+    promises.push(closeTraceSegment(parentSegment)
       .then((res) => { console.log('Close parentSegment', res, parentSegment); parentSegment = null; return res; })
       .catch(err => console.error('shutdown parent', err.message, err.stack)));
   }
@@ -839,6 +839,7 @@ const cloud = {
   //  Instrumentation
   startTrace,
   createRootTrace,
+  sendTrace,
 
   //  File
   readFile,

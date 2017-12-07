@@ -130,6 +130,12 @@ function wrap(scloud) {
       .catch((error) => { console.error('writeLine', error.message, error.log); throw error; });
   }
 
+  function readLine(req, prefix, name, suffix, fields) { // eslint-disable-next-line prefer-template
+    const filename = `${prefix ? prefix + '-' : ''}${name}${suffix ? '-' + suffix : ''}.json`;
+    return scloud.readFile(req, process.env.TRACE_BUCKET, filename)
+      .catch((error) => { console.error('readLine', error.message, error.log); throw error; });
+  }
+
   function processLine(req, line) {
     //  Returns a promise.
     const promises = [];
@@ -144,8 +150,8 @@ function wrap(scloud) {
           const topicSplit = fields.TOPICNAME.split('/');
           fields.segment = topicSplit[2];  //  1A2345-098901602c2d0d08.
           fields.marker = topicSplit[3];  //  begin or end.
-          //  segment-1A2345-098901602c2d0d08-trace.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
-          promises.push(writeLine(req, 'segment', fields.segment, 'trace', fields));
+          //  segment-1A2345-098901602c2d0d08-begin.json = { trace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+          promises.push(writeLine(req, 'segment', fields.segment, fields.marker, fields));
           //  trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-begin.json = { segment: 1A2345-098901602c2d0d08 }
           promises.push(writeLine(req, 'trace', fields.trace, fields.marker, fields));
         } else if (fields.IpAddress && fields.SourcePort) {
@@ -167,7 +173,66 @@ function wrap(scloud) {
       }
       default: break;
     }
-    return Promise.all(promises);
+    return Promise.all(promises)
+      .then(() => fields);
+  }
+
+  function matchTrace(req, endTrace) {
+    const fields = { endTrace };
+    //  Given trace 55c11976-fbec-df43-86a3-3295ba6f1b89, find:
+    //  [1] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-address.json = { address: 13.229.60.16, port: 60276 }
+    return readLine(req, 'trace', fields.endTrace, 'address')
+      .then((res) => { fields.endAddress = res.address; fields.endPort = res.port; })
+    //  [2] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-end.json = { segment: 1A2345-098901602c2d0d08 }
+      .then(() => readLine(req, 'trace', fields.endTrace, 'end'))
+      .then((res) => { fields.segment = res.segment; })
+    //  [3] segment-1A2345-098901602c2d0d08-begin.json = { beginTrace: 15ef61e1-693b-9011-14f7-f64f9bd47c4b }
+      .then(() => readLine(req, 'segment', fields.segment, 'begin'))
+      .then((res) => { fields.beginTrace = res.beginTrace; })
+    //  [4] trace-15ef61e1-693b-9011-14f7-f64f9bd47c4b-address.json = { address: 13.229.60.16, port: 60272 }
+      .then(() => readLine(req, 'trace', fields.beginTrace, 'address'))
+      .then((res) => { fields.beginAddress = res.address; fields.beginPort = res.port; })
+    //  [5] address-13.229.60.16-60274.json = { trace: 0be5ef8f-0de3-a345-ff4d-79967f07b24e }
+      .then(() => {
+        //  Confirm that beginAddress = endAddress.
+        if (fields.beginAddress !== fields.endAddress) throw new Error('mismatched_address');
+        //  Loop from beginPort + 1 to endPort - 1.
+        const promises = [];
+        for (let port = fields.beginPort + 1; port <= fields.endPort - 1; port += 1) {
+          //  Check whether the port exists.
+          promises.push(readLine(req, 'address', fields.beginAddress, port)
+            .then((res) => {
+              //  Found the port.  Save the trace.
+              fields.resultAddress = fields.beginAddress;
+              fields.resultPort = port;
+              fields.resultTrace = res.trace;
+            })
+            .catch(() => null));  //  Suppress any not-found errors.
+        }
+        return Promise.all(promises);
+      })
+      .then(() => { if (!fields.resultTrace) throw new Error('port_not_found'); })
+    //  [6] trace-0be5ef8f-0de3-a345-ff4d-79967f07b24e-rule.json = { rule: sigfoxRouteMessage }
+      .then(() => readLine(req, 'trace', fields.resultTrace, 'rule'))
+      .then((res) => { fields.rule = res.rule; })
+      //  [7] segment-1A2345-098901602c2d0d08.json = (segment)
+      //  Return the fields for the caller to close fields.segment=segment-1A2345-098901602c2d0d08
+      .then(() => fields) // eslint-disable-next-line no-param-reassign
+      .catch((error) => { error.message = `[${fields.length}] ${error.message}`; throw error; });
+  }
+
+  function closeSegment(req, fields) {
+    //  Read the sender, rule, receiver segments from S3 and open/close them.
+    let senderSegment = null;
+    let ruleSegment = null;
+    let receiverSegment = null;
+    return readLine(req, 'segment', fields.segment, null)
+      .then((res) => {
+        senderSegment = res.senderSegment;
+        ruleSegment = res.ruleSegment;
+        receiverSegment = res.receiverSegment;
+      })
+      .catch((error) => { throw error; });
   }
 
   const zlib = require('zlib');
