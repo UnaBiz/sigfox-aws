@@ -245,7 +245,10 @@ function wrap(scloud) {
         const ruleSegment = res.ruleSegment;
         // const receiverSegment = res.receiverSegment;
 
-        ruleSegment.name = fields.rule;
+        const device = ruleSegment.user; // eslint-disable-next-line no-param-reassign
+        req.device = device;
+
+        ruleSegment.name = `${device}_@_RULE_${fields.rule}`;
         ruleSegment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
         if (ruleSegment.in_progress) delete ruleSegment.in_progress;
         scloud.sendTrace(req, ruleSegment);
