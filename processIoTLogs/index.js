@@ -1,4 +1,5 @@
 //  processIoTLogs Installation Instructions:
+//  In AWS IoT -> Settings, enable detailed tracing
 //  Copy and paste the entire contents of this file into a Lambda Function
 //  Name: processIoTLogs
 //  Runtime: Node.js 6.10
@@ -12,8 +13,6 @@
 //    NODE_ENV=production
 //    TRACE_BUCKET=sigfox-trace-???
 
-//  In AWS IoT, enable detailed tracing
-
 //  Add Trigger:
 //  CloudWatch Logs
 //  Log Group: AWSIotLogs
@@ -22,7 +21,9 @@
 //  Enable Trigger: Yes
 
 /* eslint-disable max-len, camelcase, no-console, no-nested-ternary, import/no-dynamic-require, import/newline-after-import, import/no-unresolved, global-require */
-
+//  Parse the AWS IoT Log in CloudWatch format that is passed in as the
+//  parameter. Watch for any IoT Rules and Lambda Functions executed.  If detected, fetch the AWS XRay
+//  segment from AWS S3 storage and open/close the segments.
 //  We use AutoInstall to install any Node.js libraries automatically, without manually packaging them.
 //  See https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/autoinstall.js
 //  //////////////////////////////////////////////////////////////////////////////////// endregion
@@ -186,6 +187,8 @@ function wrap(scloud) {
   }
 
   function matchTrace(req, endTrace) {
+    //  Match the historical AWS IoT logs.  Look for begin trace and end trace messages, match them
+    //  and return the segment and rule.
     const fields = { endTrace };
     //  Given trace 55c11976-fbec-df43-86a3-3295ba6f1b89, find:
     //  [1] trace-55c11976-fbec-df43-86a3-3295ba6f1b89-address.json = { address: 13.229.60.16, port: 60276 }
@@ -225,13 +228,18 @@ function wrap(scloud) {
       .then((res) => { fields.rule = res.rule; })
       //  [7] segment-1A2345-098901602c2d0d08.json = (segment)
       //  Return the fields for the caller to close fields.segment=segment-1A2345-098901602c2d0d08
-      .then(() => fields) // eslint-disable-next-line no-param-reassign
-      .catch((error) => { error.message = `[${Object.keys(fields).length}] ${error.message}`; throw error; });
+      .then(() => scloud.log(req, 'matchTrace', { result: fields }))
+      .then(() => fields)
+      .catch((error) => { // eslint-disable-next-line no-param-reassign
+        error.message = `[${Object.keys(fields).length}] ${error.message}`;
+        throw error;
+      });
   }
 
   function updateTraceSegments(req, fields) {
     //  Read the sender, rule, receiver segments from S3 and open/close them.
-    return readLine(req, 'segment', fields.segment, null)
+    const segment = fields.segment;
+    return readLine(req, 'segment', segment, null)
       .then((res) => {
         const senderSegment = res.senderSegment;
         const ruleSegment = res.ruleSegment;
@@ -245,9 +253,11 @@ function wrap(scloud) {
         senderSegment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
         if (senderSegment.in_progress) delete senderSegment.in_progress;
         scloud.sendTrace(req, senderSegment);
-        return { ruleSegment, senderSegment };
+        const result = { ruleSegment, senderSegment };
+        scloud.log(req, 'updateTraceSegments', { result, fields });
+        return result;
       })
-      .catch((error) => { throw error; });
+      .catch((error) => { console.error('updateTraceSegments', segment, fields, error); throw error; });
   }
 
   function task(req, lines) {
