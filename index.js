@@ -143,7 +143,8 @@ function sendTrace(req, segment) {
 
 function createTraceSegment(traceId0, segmentId, parentSegmentId0, name0, user, annotations, metadata, startTime, comment) {
   //  Create a new AWS XRay segment.  startTime (optional) is number of milliseconds since Jan 1 1970.
-  const suffix = ` (${process.env.PACKAGE_VERSION.split('.').join('')})`;
+  //  const suffix = ` (${process.env.PACKAGE_VERSION.split('.').join('')})`;
+  const suffix = '';
   const name = (namePrefix && namePrefix.length > 0)
     ? name0.replace(namePrefix, '')
     : name0;
@@ -513,7 +514,7 @@ function createQueueSegment(req, topic, payloadObj) {
   const metadata = getTraceMetadata(payloadObj) || {};
   const device = payloadObj.device || payloadObj.body.device || '';
   const name = `==_${device}_@_${topic}_==`;
-  const comment = 'Send message to MQTT queue';
+  const comment = `Send message to MQTT queue ${topic}`;
   const startTime = Date.now();
   metadata.startTime = startTime;
   metadata.comment = comment;
@@ -522,9 +523,9 @@ function createQueueSegment(req, topic, payloadObj) {
   const senderSegment = openTraceSegment(traceId, newTraceSegmentId(), childSegmentId, name, device, annotations, metadata,
     startTime, comment);
   const ruleSegment = createTraceSegment(traceId, newTraceSegmentId(), senderSegment.id, 'ruleSegment', device, annotations, metadata,
-    startTime, 'Execute matching rule');
+    startTime + 0.04, 'Execute matching rule');
   const receiverSegment = createTraceSegment(traceId, newTraceSegmentId(), ruleSegment.id, 'receiverSegment', device, annotations, metadata,
-    startTime, 'Start Lambda Function');
+    startTime + 0.08, 'Start Lambda Function');
 
   //  Pass the receiver segment to the payload.
   /* eslint-disable no-param-reassign */
