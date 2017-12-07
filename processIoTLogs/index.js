@@ -106,11 +106,14 @@ function wrap(scloud) {
   function parseLine(req, line) {
     // line contains
     // 2017-12-06 16:05:20.742 TRACEID:b7e75c76-4c27-b1b8-9d08-44ebeeb6a991 PRINCIPALID:AROAJF6KEGSLSKFIDBJH4:decodeStructuredMessage [INFO]  EVENT:PublishEvent TOPICNAME:sigfox/trace/1A2345-09a101602c9303d7/begin MESSAGE:PublishIn Status: SUCCESS
+    if (!line || line.trim() === '') return {};
+    const timestamp = new Date(`${line.substr(0, 23).replace(' ', 'T')}Z`).valueOf();
     const lineSplit = line.split('MESSAGE:');
     const fields = lineSplit[0];
     const message = lineSplit[1];
     const fieldsSplit = fields.split(' ');
-    const result = message ? { message } : {};
+    const result = { timestamp };
+    if (message) result.message = message;
     for (const field of fieldsSplit) {
       //  field contains key:value
       //  Skip number and [] fields.
@@ -225,7 +228,7 @@ function wrap(scloud) {
       .then(() => { if (!fields.resultTrace) throw new Error('port_not_found'); })
     //  [6] trace-0be5ef8f-0de3-a345-ff4d-79967f07b24e-rule.json = { rule: sigfoxRouteMessage }
       .then(() => readLine(req, 'trace', fields.resultTrace, 'rule'))
-      .then((res) => { fields.rule = res.rule; })
+      .then((res) => { fields.rule = res.rule; fields.timestamp = res.timestamp; })
       //  [7] segment-1A2345-098901602c2d0d08.json = (segment)
       //  Return the fields for the caller to close fields.segment=segment-1A2345-098901602c2d0d08
       .then(() => scloud.log(req, 'matchTrace', { result: fields }))
@@ -249,11 +252,11 @@ function wrap(scloud) {
         req.device = device;
 
         ruleSegment.name = `${device}_@_RULE_${fields.rule}`;
-        ruleSegment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
-        if (ruleSegment.in_progress) delete ruleSegment.in_progress;
+        ruleSegment.start_time = fields.timestamp / 1000.0; // eslint-disable-next-line no-param-reassign
+        // if (ruleSegment.in_progress) delete ruleSegment.in_progress;
         scloud.sendTrace(req, ruleSegment);
 
-        senderSegment.end_time = Date.now() / 1000.0; // eslint-disable-next-line no-param-reassign
+        senderSegment.end_time = fields.timestamp / 1000.0; // eslint-disable-next-line no-param-reassign
         if (senderSegment.in_progress) delete senderSegment.in_progress;
         scloud.sendTrace(req, senderSegment);
         const result = { ruleSegment, senderSegment };

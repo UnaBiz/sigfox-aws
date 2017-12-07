@@ -394,16 +394,14 @@ function writeFile(req, bucket, name, obj) {
 
 function readFile(req, bucket, name) {
   //  Read file from S3 bucket.  Returns a promise for a JavaScript object.
+  //  Return null if not found.
   const params = {
     Bucket: bucket,
     Key: name,
   };
   return s3.getObject(params).promise()
     .then(res => (res && res.Body) ? JSON.parse(res.Body) : null)
-    .catch((error) => {
-      module.exports.error(req, 'readFile', { error, bucket, name });
-      throw error;
-    });
+    .catch(() => null);
 }
 
 function deleteFile(req, bucket, name) {
