@@ -1,6 +1,4 @@
-(UNDER DEVELOPMENT)
-
-**sigfox-aws** is a software framework for building a
+*sigfox-aws** is a software framework for building a
 Sigfox server with Amazon Web Service Lambda Functions and AWS IoT MQTT message queues:
 
 - **Modular**: Process Sigfox messages in modular steps using 
@@ -29,6 +27,19 @@ Other `sigfox-aws` modules available:
     Adapter for writing Sigfox messages into SQL databases like **MySQL, Postgres, MSSQL, MariaDB and Oracle**
 
 [<kbd><img src="https://storage.googleapis.com/unabiz-media/sigfox-gcloud/sigfox-aws-arch.svg" width="1024"></kbd>](https://storage.googleapis.com/unabiz-media/sigfox-gcloud/sigfox-aws-arch.svg)
+
+# Installing the `sigfox-aws` server
+
+Instructions for installing the `sigfox-aws` Lambda Functions and AWS IoT Rules may
+be found here:
+
+https://github.com/UnaBiz/sigfox-aws/blob/master/sigfoxCallback/index.js
+
+https://github.com/UnaBiz/sigfox-aws/blob/master/routeMessage/index.js
+
+https://github.com/UnaBiz/sigfox-aws/blob/master/decodeStructuredMessage/index.js
+
+https://github.com/UnaBiz/sigfox-aws/blob/master/processIoTLogs/index.js
 
 # Monitoring the `sigfox-aws` server
 
