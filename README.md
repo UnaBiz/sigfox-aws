@@ -1,4 +1,4 @@
-*sigfox-aws** is a software framework for building a
+**sigfox-aws** is a software framework for building a
 Sigfox server with Amazon Web Service Lambda Functions and AWS IoT MQTT message queues:
 
 - **Modular**: Process Sigfox messages in modular steps using 
@@ -20,10 +20,10 @@ will work on `sigfox-aws` and vice versa.
 
 Other `sigfox-aws` modules available:
 
-1. [`sigfox-aws-ubidots`:](https://www.npmjs.com/package/sigfox-aws-ubidots)
+1. [`sigfox-iot-ubidots`:](https://www.npmjs.com/package/sigfox-iot-ubidots)
     Adapter for integrating Sigfox devices with the easy and friendly **Ubidots IoT platform**
 
-2. [`sigfox-aws-data`:](https://www.npmjs.com/package/sigfox-aws-data)
+2. [`sigfox-iot-data`:](https://www.npmjs.com/package/sigfox-iot-data)
     Adapter for writing Sigfox messages into SQL databases like **MySQL, Postgres, MSSQL, MariaDB and Oracle**
 
 [<kbd><img src="https://storage.googleapis.com/unabiz-media/sigfox-gcloud/sigfox-aws-arch.svg" width="1024"></kbd>](https://storage.googleapis.com/unabiz-media/sigfox-gcloud/sigfox-aws-arch.svg)
@@ -40,6 +40,30 @@ https://github.com/UnaBiz/sigfox-aws/blob/master/routeMessage/index.js
 https://github.com/UnaBiz/sigfox-aws/blob/master/decodeStructuredMessage/index.js
 
 https://github.com/UnaBiz/sigfox-aws/blob/master/processIoTLogs/index.js
+
+# Installing AWS Lambda dependencies automatically with AutoInstall
+
+`sigfox-aws` uses a script called **AutoInstall** that allows you to use require(...) for NPM modules in AWS Lambda Functions,
+**without preinstalling or bundling the dependencies in advance.**  This is meant to replicate the auto NPM install feature in Google Cloud Functions.
+
+The AWS Lambda Function only needs to call AutoInstall with a list NPM modules to be installed.  
+Upon starting the AWS Lambda Function, AutoInstall will install the NPM modules into `/tmp/node_modules`.
+After installing the modules, AutoInstall launches a copy of the current Lambda Function script,
+by copying it to /tmp/index.js.  The Lambda Function may then use the installed modules.
+
+This is not as fast as preinstalling and bundling the dependencies, but it's easier to maintain and faster to prototype.
+The first call to the AWS Lambda Function is slower (about 20 seconds for `sigfoxCallback`) 
+because AutoInstall needs to load the dependencies. But subsequent calls will be faster (generally under 1 second) 
+because the dependencies will be reused from /tmp/node_modules until AWS spawns another instance of the
+Lambda Function.
+
+The AutoInstall script is located at:
+
+https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/autoinstall.js
+
+Standard AutoInstall template with sample usage:
+
+https://github.com/UnaBiz/sigfox-iot-cloud/blob/master/test/test-autoinstall.js
 
 # Monitoring the `sigfox-aws` server
 
@@ -70,22 +94,24 @@ and injects a new sensor value named `tmpsum`
 
 https://github.com/UnaBiz/sigfox-aws/blob/master/aggregateSensorData/index.js
 
-# `sigfox-aws-ubidots` adapter for Ubidots
+# `sigfox-iot-ubidots` adapter for Ubidots
 
-The [`sigfox-aws-ubidots`](https://www.npmjs.com/package/sigfox-aws-ubidots) adapter is a Google Cloud Function
+The [`sigfox-iot-ubidots`](https://www.npmjs.com/package/sigfox-iot-ubidots) adapter is an AWS Lambda Function
 (developed with the `sigfox-aws` framework) that integrates with **Ubidots** to provide a comprehensive IoT
 platform for Sigfox.
 
-With Ubidots and `sigfox-aws-ubidots`, you may easily visualise sensor data from your Sigfox devices and monitor
+With Ubidots and `sigfox-iot-ubidots`, you may easily visualise sensor data from your Sigfox devices and monitor
 for alerts. To perform custom processing of your Sigfox device messages before passing to Ubidots,
 you may write a Google Cloud Function with the `sigfox-aws` framework.
 
-`sigfox-aws-ubidots` also lets you to visualise in real-time the **Sigfox Geolocation** data from your Sigfox devices,
+`sigfox-iot-ubidots` also lets you to visualise in real-time the **Sigfox Geolocation** data from your Sigfox devices,
 or other kinds of GPS tracking data.  For details, check out:
 
-[`https://www.npmjs.com/package/sigfox-aws-ubidots`](https://www.npmjs.com/package/sigfox-aws-ubidots)
+[`https://www.npmjs.com/package/sigfox-iot-ubidots`](https://www.npmjs.com/package/sigfox-iot-ubidots)
 
 [`https://unabiz.github.io/unashield/ubidots`](https://unabiz.github.io/unashield/ubidots)
+
+(Note: `sigfox-gcloud-ubidots` has been merged and renamed as `sigfox-iot-ubidots`)
 
 [<kbd><img src="https://storage.googleapis.com/unabiz-media/sigfox-gcloud/ubidots-dashboard.jpg" width="800"></kbd>](https://storage.googleapis.com/unabiz-media/sigfox-gcloud/ubidots-dashboard.png)
 
@@ -93,12 +119,14 @@ or other kinds of GPS tracking data.  For details, check out:
 
 [<kbd><img src="https://storage.googleapis.com/unabiz-media/sigfox-gcloud/ubidots-device.jpg" width="800"></kbd>](https://storage.googleapis.com/unabiz-media/sigfox-gcloud/ubidots-device.png)
 
-# `sigfox-aws-data` adapter for databases
+# `sigfox-iot-data` adapter for databases
 
-The [`sigfox-aws-data`](https://www.npmjs.com/package/sigfox-aws-data) adapter is a Google Cloud Function
+The [`sigfox-iot-data`](https://www.npmjs.com/package/sigfox-iot-data) adapter is an AWS Lambda Function
 (developed with the `sigfox-aws` framework) that writes decoded Sigfox messages into many types of SQL databases
 including **MySQL, Postgres, MSSQL, MariaDB and Oracle**. For details, check out:
 
-[`https://www.npmjs.com/package/sigfox-aws-data`](https://www.npmjs.com/package/sigfox-aws-data)
+[`https://www.npmjs.com/package/sigfox-iot-data`](https://www.npmjs.com/package/sigfox-iot-data)
+
+(Note: `sigfox-gcloud-data` has been merged and renamed as `sigfox-iot-data`)
 
 [<kbd><img src="https://storage.googleapis.com/unabiz-media/sigfox-gcloud/data-mysql.png" width="800"></kbd>](https://storage.googleapis.com/unabiz-media/sigfox-gcloud/data-mysql.png)
