@@ -287,7 +287,7 @@ function createRootTrace(req, traceId0, traceSegment0) {
     //  Resume the receiver segment from the previous Lambda.
     parentSegment = traceSegment0;
     const name = `${getLambdaPrefix(parentSegment.annotations)}${functionName}`;
-    parentSegment.http.request.url += ` ${functionName}`;
+    parentSegment.http.request.method += ` ${functionName}`;
     parentSegment.name = name;
     traceId = parentSegment.trace_id;
     parentSegmentId = parentSegment.id;
