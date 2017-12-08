@@ -187,3 +187,6 @@ The message will be decoded by Sigfox before executing any AWS IoT Rules.
 per device type. AWS Lambda Functions may be built with the `sigfox-aws` framework
 to perform custom processing of Sigfox messages. The `sigfox-aws` adapters for
 Ubidots and SQL Databases were built with `sigfox-aws`.
+
+`sigfox-aws` also supports AWS X-Ray for easier tracing and troubleshooting
+of Sigfox message processing.
